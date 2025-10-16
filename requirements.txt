@@ -1,0 +1,79 @@
+# LUPE Analysis Tool - Python Dependencies
+#
+# IMPORTANT: These versions are pinned to match the reference repository
+# to ensure compatibility with the pre-trained A-SOiD model.
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# Recommended: Use a virtual environment
+#   python -m venv env
+#   env\Scripts\activate  (Windows)
+#   source env/bin/activate  (macOS/Linux)
+#   pip install -r requirements.txt
+
+# ============================================================================
+# CRITICAL LIBRARIES (pinned for model compatibility)
+# ============================================================================
+# These versions are chosen for model compatibility while ensuring wheels
+# are available for all platforms (Windows/macOS/Linux)
+
+# Machine Learning - Using 1.2.1 (matches the A-SOiD pre-trained model version)
+# IMPORTANT: The pre-trained model was trained with sklearn 1.2.1 and is INCOMPATIBLE
+# with sklearn 1.3.0+ due to breaking changes in tree node structure (missing_go_to_left field)
+# DO NOT upgrade to 1.3.x as it will cause model loading failures
+scikit-learn==1.2.1
+
+# Core Scientific Computing
+numpy==1.26.4
+pandas==2.2.2
+scipy==1.13.0
+
+# Performance Optimization (JIT compilation)
+numba==0.58.1
+llvmlite==0.41.1
+
+# Model Serialization
+joblib==1.4.2
+
+# ============================================================================
+# VISUALIZATION LIBRARIES
+# ============================================================================
+matplotlib==3.8.2
+seaborn==0.13.0
+pillow==10.3.0
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
+# Progress Bars
+tqdm==4.66.1
+
+# ============================================================================
+# OPTIONAL: JUPYTER NOTEBOOK SUPPORT
+# ============================================================================
+# Uncomment if you want to run notebooks from the reference repository
+# jupyter==1.0.0
+# jupyterlab==4.0.9
+# ipython==8.18.1
+# notebook==7.0.6
+# ipykernel==6.27.1
+# ipywidgets==8.1.1
+
+# ============================================================================
+# GUI
+# ============================================================================
+# tkinter - included with Python standard library (no installation needed)
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# 1. scikit-learn 1.2.1 is REQUIRED to match the pre-trained A-SOiD model version
+#    - The model has sklearn 1.2.1 dependencies baked into its pickle format
+#    - sklearn 1.3.0+ has breaking changes (missing_go_to_left field) that prevent loading
+#    - If pip install fails on Windows, use: pip install --prefer-binary scikit-learn==1.2.1
+#    - OR use conda: conda install scikit-learn=1.2.1
+# 2. If you encounter installation issues, try: pip install --upgrade pip setuptools wheel
+# 3. NumPy 2.0+ has breaking changes - stay on 1.26.4
+# 4. Verify versions after install: pip list | findstr "numpy scikit-learn"
+# 5. Python 3.11.x is recommended. Python 3.13+ may have compatibility issues.

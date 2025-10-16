@@ -1,0 +1,62 @@
+{
+  "_description": "LUPE Analysis User Settings",
+  "_note": "These settings can be customized by the user for their specific analysis needs",
+
+  "paths": {
+    "default_model_path": "",
+    "default_model_path_description": "Path to the LUPE A-SOiD model file (.pkl)",
+    "default_data_input_path": "",
+    "default_data_input_path_description": "Default directory for input data (DLC CSV files)",
+    "default_output_path": "outputs",
+    "default_output_path_description": "Default directory for analysis outputs"
+  },
+
+  "output_preferences": {
+    "save_csv": true,
+    "save_csv_description": "Save analysis results as CSV files",
+    "save_plots": true,
+    "save_plots_description": "Save visualization plots",
+    "plot_format": "svg",
+    "plot_format_description": "Format for saved plots (svg, png, pdf)",
+    "plot_dpi": 600,
+    "plot_dpi_description": "Resolution for saved plots (dots per inch)",
+    "create_subdirectories": true,
+    "create_subdirectories_description": "Create separate subdirectories for each analysis type"
+  },
+
+  "dlc_preprocessing": {
+    "likelihood_threshold": 0.1,
+    "likelihood_threshold_description": "Minimum likelihood threshold for DLC pose filtering (0.0-1.0)",
+    "skip_rows": 0,
+    "skip_rows_description": "Number of extra rows to skip when loading DLC CSV files",
+    "save_preprocessed": true,
+    "save_preprocessed_description": "Save preprocessed pose data for future use",
+    "interpolation_method": "linear",
+    "interpolation_method_description": "Method for interpolating filtered poses (linear, cubic, nearest)"
+  },
+
+  "analysis_defaults": {
+    "time_bin_minutes": 1,
+    "time_bin_minutes_description": "Default time bin size in minutes for timeline analysis",
+    "minimum_bout_duration": 0.1,
+    "minimum_bout_duration_description": "Minimum duration (seconds) for a behavior bout to be counted"
+  },
+
+  "gui_preferences": {
+    "window_width": 1200,
+    "window_height": 800,
+    "theme": "default",
+    "theme_description": "GUI theme (default, dark, light)",
+    "show_tooltips": true,
+    "show_tooltips_description": "Display helpful tooltips in the GUI"
+  },
+
+  "advanced": {
+    "parallel_processing": false,
+    "parallel_processing_description": "Enable parallel processing for multiple files (experimental)",
+    "verbose_logging": false,
+    "verbose_logging_description": "Enable detailed logging for debugging",
+    "cache_features": true,
+    "cache_features_description": "Cache extracted features to speed up repeated analysis"
+  }
+}

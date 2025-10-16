@@ -1,0 +1,62 @@
+{
+  "_description": "LUPE Analysis Metadata Configuration",
+  "_note": "This file contains behavior definitions, visual styling, and physical parameters for LUPE analysis",
+
+  "behaviors": {
+    "names": [
+      "still",
+      "walking",
+      "rearing",
+      "grooming",
+      "licking hindpaw L",
+      "licking hindpaw R"
+    ],
+    "colors": [
+      "crimson",
+      "darkcyan",
+      "goldenrod",
+      "royalblue",
+      "rebeccapurple",
+      "mediumorchid"
+    ]
+  },
+
+  "keypoints": [
+    "nose",
+    "mouth",
+    "l_forepaw",
+    "l_forepaw_digit",
+    "r_forepaw",
+    "r_forepaw_digit",
+    "l_hindpaw",
+    "l_hindpaw_digit1",
+    "l_hindpaw_digit2",
+    "l_hindpaw_digit3",
+    "l_hindpaw_digit4",
+    "l_hindpaw_digit5",
+    "r_hindpaw",
+    "r_hindpaw_digit1",
+    "r_hindpaw_digit2",
+    "r_hindpaw_digit3",
+    "r_hindpaw_digit4",
+    "r_hindpaw_digit5",
+    "genitalia",
+    "tail_base"
+  ],
+
+  "physical_parameters": {
+    "pixel_to_cm": 0.0330828,
+    "pixel_to_cm_description": "Conversion factor: 30 pixels = 1 cm"
+  },
+
+  "analysis_parameters": {
+    "framerate": 60,
+    "framerate_description": "Default framerate in frames per second for video analysis",
+    "smoothing_window": 12,
+    "smoothing_window_description": "Window size for weighted smoothing of predictions",
+    "repeat_factor": 6,
+    "repeat_factor_description": "Number of times to repeat downsampled predictions",
+    "likelihood_threshold": 0.9,
+    "likelihood_threshold_description": "Minimum likelihood value for pose estimation confidence"
+  }
+}
