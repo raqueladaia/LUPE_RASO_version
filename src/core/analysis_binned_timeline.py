@@ -90,14 +90,15 @@ def analyze_binned_timeline(behaviors: Dict[str, np.ndarray],
                             behavior_colors: list = None,
                             framerate: int = None,
                             create_plots: bool = True,
-                            save_csv: bool = True) -> Dict:
+                            save_csv: bool = True,
+                            file_prefix: str = None) -> Dict:
     """
-    Analyze behavior distribution over time for all files.
+    Analyze behavior distribution over time for a single file.
 
-    Creates timeline plots showing how behavior percentages change over time.
+    Creates timeline plot showing how behavior percentages change over time.
 
     Args:
-        behaviors (dict): Dictionary mapping file names to behavior arrays
+        behaviors (dict): Dictionary mapping file name to behavior array (single file)
         output_dir (str): Directory for output files
         bin_size_minutes (float): Size of time bins in minutes
         behavior_names (list, optional): Behavior names
@@ -105,16 +106,18 @@ def analyze_binned_timeline(behaviors: Dict[str, np.ndarray],
         framerate (int, optional): Video framerate
         create_plots (bool): Whether to create plots
         save_csv (bool): Whether to save CSV files
+        file_prefix (str, optional): Prefix for output filenames
 
     Returns:
         dict: Analysis results
 
     Example:
-        >>> behaviors = {'file1': array1, 'file2': array2}
+        >>> behaviors = {'mouse01': array1}
         >>> results = analyze_binned_timeline(
         >>>     behaviors,
-        >>>     output_dir='outputs/timeline/',
-        >>>     bin_size_minutes=1.0
+        >>>     output_dir='outputs/mouse01_analysis/',
+        >>>     bin_size_minutes=1.0,
+        >>>     file_prefix='mouse01'
         >>> )
     """
     # Get configuration
@@ -130,29 +133,25 @@ def analyze_binned_timeline(behaviors: Dict[str, np.ndarray],
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Bin all files and calculate means/SEMs
-    all_binned_data = {i: [] for i in range(len(behavior_names))}
+    # Get the single file (should only be one)
+    if len(behaviors) != 1:
+        raise ValueError(f"Expected single file, got {len(behaviors)} files")
 
-    for file_name, behavior_array in behaviors.items():
-        time_bins, ratios = bin_behavior_timeline(behavior_array, bin_size_minutes, framerate)
+    file_name, behavior_array = next(iter(behaviors.items()))
 
-        # Store ratios for each behavior
-        for behavior_id, ratio_array in ratios.items():
-            all_binned_data[behavior_id].append(ratio_array)
+    # Use file_prefix if provided, otherwise use file_name
+    if file_prefix is None:
+        file_prefix = file_name
 
-    # Calculate mean and SEM across files
-    n_bins = len(time_bins)
+    # Bin the behavior array
+    time_bins, ratios = bin_behavior_timeline(behavior_array, bin_size_minutes, framerate)
+
+    # Format data for plotting (no SEM for single file, use zeros)
     behavior_stats = {}
-
     for behavior_id in range(len(behavior_names)):
-        if len(all_binned_data[behavior_id]) > 0:
-            # Convert to 2D array (files × bins)
-            data_array = np.array(all_binned_data[behavior_id])
-
-            # Calculate statistics
-            mean_vals = np.mean(data_array, axis=0)
-            sem_vals = np.std(data_array, axis=0) / np.sqrt(len(data_array))
-
+        if behavior_id in ratios:
+            mean_vals = np.array(ratios[behavior_id])
+            sem_vals = np.zeros_like(mean_vals)  # No error bars for single file
             behavior_stats[behavior_names[behavior_id]] = (mean_vals, sem_vals)
 
     results = {
@@ -165,20 +164,19 @@ def analyze_binned_timeline(behaviors: Dict[str, np.ndarray],
     if save_csv:
         # Create DataFrame with all data
         csv_data = {'time_bin': time_bins}
-        for behavior_name, (mean_vals, sem_vals) in behavior_stats.items():
-            csv_data[f'{behavior_name}_mean'] = mean_vals
-            csv_data[f'{behavior_name}_sem'] = sem_vals
+        for behavior_name, (vals, _) in behavior_stats.items():
+            csv_data[f'{behavior_name}_proportion'] = vals
 
         df = pd.DataFrame(csv_data)
-        csv_path = output_path / f'binned_timeline_{bin_size_minutes}min.csv'
+        csv_path = output_path / f'{file_prefix}_timeline_{bin_size_minutes}min.csv'
         df.to_csv(csv_path, index=False)
         results['csv_path'] = str(csv_path)
 
-        print(f'CSV saved to: {csv_path}')
+        print(f'Timeline CSV saved to: {csv_path}')
 
     # Create plot
     if create_plots:
-        plot_path = output_path / f'binned_timeline_{bin_size_minutes}min.svg'
+        plot_path = output_path / f'{file_prefix}_timeline_{bin_size_minutes}min.svg'
         fig = plot_binned_timeline(
             time_bins,
             behavior_stats,

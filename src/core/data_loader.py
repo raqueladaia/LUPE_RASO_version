@@ -75,7 +75,7 @@ def load_model(path: str) -> Any:
         try:
             print(f"Attempting to load model using {strategy_name}...")
             model = loader()
-            print(f"✓ Successfully loaded model using {strategy_name}")
+            print(f"[OK] Successfully loaded model using {strategy_name}")
 
             # Apply dtype fixes to ensure compatibility
             # model = _fix_model_dtypes(model)
@@ -83,7 +83,7 @@ def load_model(path: str) -> Any:
             return model
         except Exception as e:
             last_error = e
-            print(f"  ✗ {strategy_name} failed: {str(e)}")
+            print(f"  [ERROR] {strategy_name} failed: {str(e)}")
             continue
 
     # If all strategies failed, provide detailed error message
@@ -173,7 +173,7 @@ def _fix_model_dtypes(model: Any) -> Any:
             for name, estimator in model.steps:
                 _fix_model_dtypes(estimator)
 
-        print("  ✓ Applied dtype compatibility fixes")
+        print("  [OK] Applied dtype compatibility fixes")
 
     except Exception as e:
         # If dtype fixing fails, log warning but don't fail

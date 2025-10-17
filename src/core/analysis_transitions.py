@@ -23,26 +23,28 @@ def analyze_transitions(behaviors: Dict[str, np.ndarray],
                        output_dir: str,
                        behavior_names: list = None,
                        create_plots: bool = True,
-                       save_csv: bool = True) -> Dict:
+                       save_csv: bool = True,
+                       file_prefix: str = None) -> Dict:
     """
-    Analyze behavior transitions across all files.
+    Analyze behavior transitions for a single file.
 
     Calculates transition probabilities: how likely is each behavior to
     follow each other behavior?
 
     Args:
-        behaviors (dict): Dictionary mapping file names to behavior arrays
+        behaviors (dict): Dictionary mapping file name to behavior array (single file)
         output_dir (str): Directory for output files
         behavior_names (list, optional): Behavior names
         create_plots (bool): Whether to create plots
         save_csv (bool): Whether to save CSV files
+        file_prefix (str, optional): Prefix for output filenames
 
     Returns:
-        dict: Analysis results containing transition matrices
+        dict: Analysis results containing transition matrix
 
     Example:
-        >>> behaviors = {'file1': array1, 'file2': array2}
-        >>> results = analyze_transitions(behaviors, 'outputs/transitions/')
+        >>> behaviors = {'mouse01': array1}
+        >>> results = analyze_transitions(behaviors, 'outputs/mouse01_analysis/', file_prefix='mouse01')
         >>> print(results['transition_matrix'])
         >>> # Shows: probability of transitioning from each behavior (rows)
         >>> #        to each behavior (columns)
@@ -56,22 +58,18 @@ def analyze_transitions(behaviors: Dict[str, np.ndarray],
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Calculate transition matrix for each file
-    all_transition_matrices = []
+    # Get the single file (should only be one)
+    if len(behaviors) != 1:
+        raise ValueError(f"Expected single file, got {len(behaviors)} files")
 
-    for file_name, behavior_array in behaviors.items():
-        trans_matrix = behavior_transition_matrix(behavior_array, behavior_names)
-        all_transition_matrices.append(trans_matrix.values)
+    file_name, behavior_array = next(iter(behaviors.items()))
 
-    # Average across all files
-    mean_transition_matrix = np.mean(all_transition_matrices, axis=0)
+    # Use file_prefix if provided, otherwise use file_name
+    if file_prefix is None:
+        file_prefix = file_name
 
-    # Create DataFrame
-    transition_df = pd.DataFrame(
-        mean_transition_matrix,
-        index=behavior_names,
-        columns=behavior_names
-    )
+    # Calculate transition matrix for this file
+    transition_df = behavior_transition_matrix(behavior_array, behavior_names)
 
     results = {
         'transition_matrix': transition_df
@@ -79,7 +77,7 @@ def analyze_transitions(behaviors: Dict[str, np.ndarray],
 
     # Save CSV
     if save_csv:
-        csv_path = output_path / 'transition_matrix.csv'
+        csv_path = output_path / f'{file_prefix}_transitions_matrix.csv'
         transition_df.to_csv(csv_path)
         results['csv_path'] = str(csv_path)
 
@@ -87,9 +85,9 @@ def analyze_transitions(behaviors: Dict[str, np.ndarray],
 
     # Create heatmap
     if create_plots:
-        plot_path = output_path / 'transition_matrix_heatmap.svg'
+        plot_path = output_path / f'{file_prefix}_transitions_heatmap.svg'
         fig = plot_heatmap(
-            mean_transition_matrix,
+            transition_df.values,
             row_labels=behavior_names,
             col_labels=behavior_names,
             title='Behavior Transition Probabilities',

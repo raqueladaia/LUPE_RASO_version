@@ -61,36 +61,35 @@ def analyze_instance_counts(behaviors: Dict[str, np.ndarray],
                            behavior_names: list = None,
                            behavior_colors: list = None,
                            create_plots: bool = True,
-                           save_csv: bool = True) -> Dict:
+                           save_csv: bool = True,
+                           file_prefix: str = None) -> Dict:
     """
-    Analyze and visualize instance counts for all files.
+    Analyze and visualize bout counts for a single file.
 
     This function:
-    1. Counts behavior bouts for each file
-    2. Calculates mean and standard deviation across files
-    3. Creates bar charts showing results
-    4. Saves data to CSV
+    1. Counts behavior bouts for the file
+    2. Creates bar chart showing results
+    3. Saves data to CSV
 
     Args:
-        behaviors (dict): Dictionary mapping file names to behavior arrays
+        behaviors (dict): Dictionary mapping file name to behavior array (single file)
         output_dir (str): Directory for output files
         behavior_names (list, optional): Behavior names
         behavior_colors (list, optional): Colors for visualization
         create_plots (bool): Whether to create plots
         save_csv (bool): Whether to save CSV files
+        file_prefix (str, optional): Prefix for output filenames
 
     Returns:
         dict: Analysis results containing:
-            - 'mean_counts': Mean bout count per behavior
-            - 'std_counts': Standard deviation of bout counts
-            - 'all_counts': Bout counts for each file
+            - 'bout_counts': Bout count per behavior
             - 'csv_path': Path to saved CSV (if save_csv=True)
             - 'plot_path': Path to saved plot (if create_plots=True)
 
     Example:
-        >>> behaviors = {'file1': array1, 'file2': array2}
-        >>> results = analyze_instance_counts(behaviors, 'outputs/instance_counts/')
-        >>> print(f"Mean walking bouts: {results['mean_counts'][1]}")
+        >>> behaviors = {'mouse01': array1}
+        >>> results = analyze_instance_counts(behaviors, 'outputs/mouse01_analysis/', file_prefix='mouse01')
+        >>> print(f"Walking bouts: {results['bout_counts'][1]}")
     """
     # Get configuration
     config = get_config()
@@ -103,54 +102,45 @@ def analyze_instance_counts(behaviors: Dict[str, np.ndarray],
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Count bouts for all files
-    all_bout_counts = []
-    for file_name, behavior_array in behaviors.items():
-        bout_counts = count_behavior_bouts(behavior_array, behavior_names)
-        all_bout_counts.append(bout_counts)
+    # Get the single file (should only be one)
+    if len(behaviors) != 1:
+        raise ValueError(f"Expected single file, got {len(behaviors)} files")
 
-    # Convert to numpy array for easy statistics
-    all_bout_counts = np.array(all_bout_counts)
+    file_name, behavior_array = next(iter(behaviors.items()))
 
-    # Calculate statistics
-    mean_counts = np.nanmean(all_bout_counts, axis=0)
-    std_counts = np.nanstd(all_bout_counts, axis=0)
+    # Use file_prefix if provided, otherwise use file_name
+    if file_prefix is None:
+        file_prefix = file_name
+
+    # Count bouts for the file
+    bout_counts = count_behavior_bouts(behavior_array, behavior_names)
+    bout_counts_array = np.array(bout_counts)
 
     results = {
-        'mean_counts': mean_counts,
-        'std_counts': std_counts,
-        'all_counts': all_bout_counts
+        'bout_counts': bout_counts_array
     }
 
     # Save CSV
     if save_csv:
-        # Summary statistics CSV
         summary_df = pd.DataFrame({
             'behavior': behavior_names,
-            'mean_count': mean_counts,
-            'std_count': std_counts,
+            'bout_count': bout_counts_array,
             'color': behavior_colors
         })
-        summary_path = output_path / 'instance_counts_summary.csv'
+        summary_path = output_path / f'{file_prefix}_bout_counts_summary.csv'
         summary_df.to_csv(summary_path, index=False)
-        results['csv_summary_path'] = str(summary_path)
+        results['csv_path'] = str(summary_path)
 
-        # Raw counts CSV
-        raw_df = pd.DataFrame(all_bout_counts, columns=behavior_names)
-        raw_df.insert(0, 'file', list(behaviors.keys()))
-        raw_path = output_path / 'instance_counts_raw.csv'
-        raw_df.to_csv(raw_path, index=False)
-        results['csv_raw_path'] = str(raw_path)
+        print(f'Bout counts CSV saved to: {summary_path}')
 
-        print(f'CSV files saved to: {output_dir}')
-
-    # Create plot
+    # Create plot (no error bars for single file)
     if create_plots:
-        plot_path = output_path / 'instance_counts.svg'
+        plot_path = output_path / f'{file_prefix}_bout_counts.svg'
+        # Use zeros for std since this is a single file
         fig = plot_behavior_bars(
-            mean_counts, std_counts, behavior_names, behavior_colors,
-            title='Behavior Instance Counts',
-            xlabel='Instance counts',
+            bout_counts_array, np.zeros_like(bout_counts_array), behavior_names, behavior_colors,
+            title='Behavior Bout Counts',
+            xlabel='Bout counts',
             ylabel='Behavior',
             horizontal=True
         )

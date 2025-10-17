@@ -15,7 +15,8 @@ Usage:
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-import threading
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -29,9 +30,9 @@ class LupeLauncher:
         self.root.geometry("600x450")
         self.root.resizable(False, False)
 
-        # Track launched GUIs to prevent multiple instances
-        self.lupe_running = False
-        self.amps_running = False
+        # Track launched GUI processes
+        self.lupe_process = None
+        self.amps_process = None
 
         self._create_widgets()
 
@@ -133,8 +134,9 @@ class LupeLauncher:
         self.status_label.pack(side=tk.BOTTOM, pady=(10, 0))
 
     def _launch_lupe(self):
-        """Launch the main LUPE classification GUI in a separate thread."""
-        if self.lupe_running:
+        """Launch the main LUPE classification GUI in a separate process."""
+        # Check if LUPE is already running
+        if self.lupe_process is not None and self.lupe_process.poll() is None:
             messagebox.showinfo(
                 "Already Running",
                 "LUPE classification GUI is already running."
@@ -145,13 +147,30 @@ class LupeLauncher:
         self.status_label.config(text="Launching LUPE Classification GUI...")
         self.root.update()
 
-        # Launch in separate thread
-        thread = threading.Thread(target=self._run_lupe_gui, daemon=True)
-        thread.start()
+        # Launch in separate process
+        try:
+            # Get the path to the main_lupe_gui.py script
+            script_path = Path(__file__).parent / "main_lupe_gui.py"
+
+            # Launch as subprocess
+            self.lupe_process = subprocess.Popen(
+                [sys.executable, str(script_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
+            self.status_label.config(text="LUPE Classification GUI opened.")
+        except Exception as e:
+            messagebox.showerror(
+                "Launch Error",
+                f"Failed to launch LUPE GUI:\n{str(e)}"
+            )
+            self.status_label.config(text="")
 
     def _launch_amps(self):
-        """Launch the LUPE-AMPS GUI in a separate thread."""
-        if self.amps_running:
+        """Launch the LUPE-AMPS GUI in a separate process."""
+        # Check if AMPS is already running
+        if self.amps_process is not None and self.amps_process.poll() is None:
             messagebox.showinfo(
                 "Already Running",
                 "LUPE-AMPS analysis GUI is already running."
@@ -162,70 +181,38 @@ class LupeLauncher:
         self.status_label.config(text="Launching LUPE-AMPS GUI...")
         self.root.update()
 
-        # Launch in separate thread
-        thread = threading.Thread(target=self._run_amps_gui, daemon=True)
-        thread.start()
-
-    def _run_lupe_gui(self):
-        """Run the LUPE classification GUI (threaded)."""
+        # Launch in separate process
         try:
-            self.lupe_running = True
+            # Get the path to the main_lupe_amps_gui.py script
+            script_path = Path(__file__).parent / "main_lupe_amps_gui.py"
 
-            # Import here to avoid circular imports and delayed loading
-            from src.gui.main_window import LupeGUI
-
-            # Create and run the GUI
-            app = LupeGUI()
-
-            # Update status
-            self.status_label.config(text="LUPE Classification GUI opened.")
-
-            # Run the GUI (this blocks until window closes)
-            app.run()
-
-        except Exception as e:
-            messagebox.showerror(
-                "Launch Error",
-                f"Failed to launch LUPE GUI:\n{str(e)}"
+            # Launch as subprocess
+            self.amps_process = subprocess.Popen(
+                [sys.executable, str(script_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
             )
-        finally:
-            self.lupe_running = False
-            self.status_label.config(text="")
 
-    def _run_amps_gui(self):
-        """Run the LUPE-AMPS GUI (threaded)."""
-        try:
-            self.amps_running = True
-
-            # Import here to avoid circular imports and delayed loading
-            from src.gui.lupe_amps_window import LupeAmpsGUI
-
-            # Create and run the GUI
-            app = LupeAmpsGUI()
-
-            # Update status
             self.status_label.config(text="LUPE-AMPS GUI opened.")
-
-            # Run the GUI (this blocks until window closes)
-            app.run()
-
         except Exception as e:
             messagebox.showerror(
                 "Launch Error",
                 f"Failed to launch LUPE-AMPS GUI:\n{str(e)}"
             )
-        finally:
-            self.amps_running = False
             self.status_label.config(text="")
 
     def _on_exit(self):
         """Handle exit button click."""
-        # Check if any GUIs are running
-        if self.lupe_running or self.amps_running:
+        # Check if any GUI processes are still running
+        lupe_running = self.lupe_process is not None and self.lupe_process.poll() is None
+        amps_running = self.amps_process is not None and self.amps_process.poll() is None
+
+        if lupe_running or amps_running:
             response = messagebox.askyesno(
                 "Confirm Exit",
                 "One or more analysis GUIs are still running.\n"
-                "Close the launcher anyway?"
+                "The GUIs will continue running independently.\n\n"
+                "Close the launcher?"
             )
             if not response:
                 return

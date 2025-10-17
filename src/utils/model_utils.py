@@ -50,9 +50,9 @@ def convert_legacy_model(input_path: str,
         >>> # Convert an old A-SOiD model
         >>> convert_legacy_model('model_LUPE-AMPS.pkl', 'model_LUPE-AMPS_v2.pkl')
         Attempting to load model using standard pickle...
-        ✓ Successfully loaded model using standard pickle
-        ✓ Applied dtype compatibility fixes
-        ✓ Model converted and saved to: model_LUPE-AMPS_v2.pkl
+        [OK] Successfully loaded model using standard pickle
+        [OK] Applied dtype compatibility fixes
+        [OK] Model converted and saved to: model_LUPE-AMPS_v2.pkl
         True
     """
     from src.core.data_loader import load_model
@@ -84,7 +84,7 @@ def convert_legacy_model(input_path: str,
         joblib.dump(model, output_path, compress=3)
 
         if verbose:
-            print(f"✓ Model converted and saved to: {output_path}")
+            print(f"[OK] Model converted and saved to: {output_path}")
             print()
             print("You can now use the converted model file instead of the original.")
 
@@ -92,7 +92,7 @@ def convert_legacy_model(input_path: str,
 
     except Exception as e:
         if verbose:
-            print(f"✗ Conversion failed: {str(e)}")
+            print(f"[ERROR] Conversion failed: {str(e)}")
         return False
 
 
@@ -149,7 +149,7 @@ def verify_model(model_path: str,
         info['model_type'] = type(model).__name__
 
         if verbose:
-            print(f"✓ Model loaded successfully")
+            print(f"[OK] Model loaded successfully")
             print(f"  Type: {info['model_type']}")
 
         # Check for common attributes
@@ -168,13 +168,13 @@ def verify_model(model_path: str,
             info['can_predict'] = True
 
             if verbose:
-                print(f"✓ Prediction successful")
+                print(f"[OK] Prediction successful")
                 print(f"  Output shape: {predictions.shape}")
                 print(f"  Unique predictions: {np.unique(predictions)}")
 
         if verbose:
             print("-" * 60)
-            print("✓ Model verification PASSED")
+            print("[OK] Model verification PASSED")
 
         return True, info
 
@@ -182,7 +182,7 @@ def verify_model(model_path: str,
         info['error'] = str(e)
 
         if verbose:
-            print(f"✗ Model verification FAILED")
+            print(f"[ERROR] Model verification FAILED")
             print(f"  Error: {str(e)}")
 
         return False, info
@@ -281,7 +281,7 @@ def batch_convert_models(input_dir: str,
     Example:
         >>> results = batch_convert_models('models/', 'models_converted/')
         >>> for name, success in results.items():
-        >>>     print(f"{name}: {'✓' if success else '✗'}")
+        >>>     print(f"{name}: {'[OK]' if success else '[ERROR]'}")
     """
     input_dir = Path(input_dir)
     if not input_dir.exists():
@@ -321,7 +321,7 @@ def batch_convert_models(input_dir: str,
         results[model_file.name] = success
 
         if verbose:
-            status = "✓ Success" if success else "✗ Failed"
+            status = "[OK] Success" if success else "[ERROR] Failed"
             print(f"{status}\n")
 
     # Summary

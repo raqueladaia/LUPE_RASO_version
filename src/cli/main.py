@@ -240,7 +240,7 @@ def cmd_classify(args):
     # Load model
     print(f"\nLoading model from: {args.model}")
     model = load_model(args.model)
-    print("✓ Model loaded successfully")
+    print("[OK] Model loaded successfully")
 
     # Load pose data
     print(f"\nLoading {len(args.input)} pose data files...")
@@ -260,12 +260,12 @@ def cmd_classify(args):
         pose_data.append(data)
         file_names.append(path.stem)
 
-    print(f"✓ Loaded {len(pose_data)} files")
+    print(f"[OK] Loaded {len(pose_data)} files")
 
     # Classify behaviors
     print("\nClassifying behaviors...")
     predictions = classify_behaviors(model, pose_data, framerate=args.framerate)
-    print("✓ Classification complete")
+    print("[OK] Classification complete")
 
     # Create behaviors dictionary
     behaviors_dict = {name: pred for name, pred in zip(file_names, predictions)}
@@ -273,7 +273,7 @@ def cmd_classify(args):
     # Save results
     print(f"\nSaving results to: {args.output}")
     save_behaviors(behaviors_dict, args.output)
-    print("✓ Results saved")
+    print("[OK] Results saved")
 
     print("\n" + "=" * 60)
     print("Classification completed successfully!")
@@ -331,10 +331,10 @@ def cmd_preprocess(args):
             file_key = csv_file.stem
             processed_data[file_key] = pose_data
 
-            print(f"✓ Processed {csv_file.name}: shape {pose_data.shape}")
+            print(f"[OK] Processed {csv_file.name}: shape {pose_data.shape}")
 
         except Exception as e:
-            print(f"✗ Error processing {csv_file.name}: {str(e)}")
+            print(f"[ERROR] Error processing {csv_file.name}: {str(e)}")
             print("  Skipping this file...")
             continue
 
@@ -349,7 +349,7 @@ def cmd_preprocess(args):
     with open(output_path, 'wb') as f:
         pickle.dump(processed_data, f)
 
-    print(f"✓ Saved {len(processed_data)} file(s) to {args.output}")
+    print(f"[OK] Saved {len(processed_data)} file(s) to {args.output}")
 
     print("\n" + "=" * 60)
     print("Preprocessing completed successfully!")
@@ -371,7 +371,7 @@ def cmd_analyze(args):
     # Load behaviors
     print(f"\nLoading behaviors from: {args.behaviors}")
     behaviors = load_behaviors(args.behaviors)
-    print(f"✓ Loaded behaviors for {len(behaviors)} files")
+    print(f"[OK] Loaded behaviors for {len(behaviors)} files")
 
     # Create output directory
     output_dir = Path(args.output)
@@ -415,9 +415,9 @@ def cmd_analyze(args):
         print(f"\n[{name}]")
         try:
             func()
-            print(f"✓ {name} complete")
+            print(f"[OK] {name} complete")
         except Exception as e:
-            print(f"✗ {name} failed: {str(e)}")
+            print(f"[ERROR] {name} failed: {str(e)}")
 
     print("\n" + "=" * 60)
     print("Analysis completed!")
@@ -434,18 +434,18 @@ def cmd_export(args):
     # Load behaviors
     print(f"\nLoading behaviors from: {args.behaviors}")
     behaviors = load_behaviors(args.behaviors)
-    print(f"✓ Loaded behaviors for {len(behaviors)} files")
+    print(f"[OK] Loaded behaviors for {len(behaviors)} files")
 
     # Export to CSV
     print(f"\nExporting to: {args.output}")
     export_behaviors_to_csv(behaviors, args.output)
-    print("✓ CSV files created")
+    print("[OK] CSV files created")
 
     # Export summary if requested
     if args.summary:
         summary_path = Path(args.output) / 'behavior_summary.csv'
         export_behavior_summary(behaviors, str(summary_path))
-        print(f"✓ Summary saved to: {summary_path}")
+        print(f"[OK] Summary saved to: {summary_path}")
 
     print("\n" + "=" * 60)
     print("Export completed successfully!")

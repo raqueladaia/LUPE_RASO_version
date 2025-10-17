@@ -64,27 +64,29 @@ def analyze_bout_durations(behaviors: Dict[str, np.ndarray],
                            behavior_names: list = None,
                            framerate: int = None,
                            create_plots: bool = True,
-                           save_csv: bool = True) -> Dict:
+                           save_csv: bool = True,
+                           file_prefix: str = None) -> Dict:
     """
-    Analyze bout durations across all files.
+    Analyze bout durations for a single file.
 
     Calculates statistics (mean, median, std, min, max) for bout durations
     of each behavior.
 
     Args:
-        behaviors (dict): Dictionary mapping file names to behavior arrays
+        behaviors (dict): Dictionary mapping file name to behavior array (single file)
         output_dir (str): Directory for output files
         behavior_names (list, optional): Behavior names
         framerate (int, optional): Video framerate
         create_plots (bool): Whether to create plots
         save_csv (bool): Whether to save CSV files
+        file_prefix (str, optional): Prefix for output filenames
 
     Returns:
         dict: Analysis results
 
     Example:
-        >>> behaviors = {'file1': array1, 'file2': array2}
-        >>> results = analyze_bout_durations(behaviors, 'outputs/durations/')
+        >>> behaviors = {'mouse01': array1}
+        >>> results = analyze_bout_durations(behaviors, 'outputs/mouse01_analysis/', file_prefix='mouse01')
         >>> print(results['statistics'])
     """
     # Get configuration
@@ -98,61 +100,67 @@ def analyze_bout_durations(behaviors: Dict[str, np.ndarray],
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Collect all durations
-    all_durations = {i: [] for i in range(len(behavior_names))}
+    # Get the single file (should only be one)
+    if len(behaviors) != 1:
+        raise ValueError(f"Expected single file, got {len(behaviors)} files")
 
-    for file_name, behavior_array in behaviors.items():
-        file_durations = calculate_bout_durations(behavior_array, framerate)
-        for behavior_id, durations in file_durations.items():
-            all_durations[behavior_id].extend(durations)
+    file_name, behavior_array = next(iter(behaviors.items()))
+
+    # Use file_prefix if provided, otherwise use file_name
+    if file_prefix is None:
+        file_prefix = file_name
+
+    # Calculate durations for this file
+    file_durations = calculate_bout_durations(behavior_array, framerate)
 
     # Calculate statistics
     stats_data = []
     for behavior_id in range(len(behavior_names)):
-        durations = all_durations[behavior_id]
-        if len(durations) > 0:
-            stats_data.append({
-                'behavior': behavior_names[behavior_id],
-                'mean_duration_sec': np.mean(durations),
-                'median_duration_sec': np.median(durations),
-                'std_duration_sec': np.std(durations),
-                'min_duration_sec': np.min(durations),
-                'max_duration_sec': np.max(durations),
-                'total_bouts': len(durations)
-            })
+        if behavior_id in file_durations:
+            durations = file_durations[behavior_id]
+            if len(durations) > 0:
+                stats_data.append({
+                    'behavior': behavior_names[behavior_id],
+                    'mean_duration_sec': np.mean(durations),
+                    'median_duration_sec': np.median(durations),
+                    'std_duration_sec': np.std(durations),
+                    'min_duration_sec': np.min(durations),
+                    'max_duration_sec': np.max(durations),
+                    'total_bouts': len(durations)
+                })
 
     stats_df = pd.DataFrame(stats_data)
 
     results = {
         'statistics': stats_df,
-        'all_durations': all_durations
+        'durations': file_durations
     }
 
     # Save CSV
     if save_csv:
         # Statistics summary
-        stats_path = output_path / 'bout_durations_statistics.csv'
+        stats_path = output_path / f'{file_prefix}_bout_durations_statistics.csv'
         stats_df.to_csv(stats_path, index=False)
         results['csv_stats_path'] = str(stats_path)
 
         # Raw durations (long format for plotting)
         raw_data = []
-        for behavior_id, durations in all_durations.items():
+        for behavior_id, durations in file_durations.items():
             for duration in durations:
                 raw_data.append({
                     'behavior': behavior_names[behavior_id],
                     'duration_sec': duration
                 })
         raw_df = pd.DataFrame(raw_data)
-        raw_path = output_path / 'bout_durations_raw.csv'
+        raw_path = output_path / f'{file_prefix}_bout_durations_raw.csv'
         raw_df.to_csv(raw_path, index=False)
         results['csv_raw_path'] = str(raw_path)
 
-        print(f'CSV files saved to: {output_dir}')
+        print(f'Duration CSVs saved to: {output_dir}')
 
     # Create plot
     if create_plots and len(raw_data) > 0:
-        plot_path = output_path / 'bout_durations_boxplot.svg'
+        plot_path = output_path / f'{file_prefix}_bout_durations.svg'
         fig = plot_box_whisker(
             raw_df,
             x_col='behavior',

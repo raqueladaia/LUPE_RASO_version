@@ -228,7 +228,7 @@ def preprocess_dlc_csv(csv_path: str,
         print(f"  Saved to: {output_path} ({save_time:.2f}s)")
 
     total_time = time.time() - total_start
-    print(f"✓ Preprocessing complete (total: {total_time:.2f}s)")
+    print(f"[OK] Preprocessing complete (total: {total_time:.2f}s)")
     return filtered_data
 
 
@@ -291,7 +291,7 @@ def batch_process_dlc_files(input_directory: str,
             processed_data[file_key] = pose_data
 
         except Exception as e:
-            print(f"✗ Error processing {csv_file.name}: {str(e)}")
+            print(f"[ERROR] Error processing {csv_file.name}: {str(e)}")
             print("  Skipping this file and continuing...")
             continue
 
@@ -304,7 +304,7 @@ def batch_process_dlc_files(input_directory: str,
             pickle.dump(processed_data, f)
 
         print("\n" + "=" * 60)
-        print(f"✓ Saved combined data to: {output_path}")
+        print(f"[OK] Saved combined data to: {output_path}")
         print(f"  Total files processed: {len(processed_data)}")
         print("=" * 60)
 

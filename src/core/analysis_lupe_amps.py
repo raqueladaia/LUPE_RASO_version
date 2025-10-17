@@ -52,40 +52,37 @@ class LupeAmpsAnalysis:
     def __init__(self,
                  model_path: str = 'models/model_AMPS.pkl',
                  num_behaviors: int = 6,
-                 original_fps: int = 60,
-                 target_fps: int = 20,
-                 recording_length_min: int = 30):
+                 target_fps: int = 20):
         """
         Initialize LUPE-AMPS analysis.
 
+        Note: Recording length and original framerate are now read automatically
+        from the summary CSV files generated during LUPE analysis. Each file can
+        have different parameters.
+
         Args:
             model_path (str): Path to PCA model file
-            num_behaviors (int): Number of behavior states
-            original_fps (int): Original recording framerate
-            target_fps (int): Target framerate after downsampling
-            recording_length_min (int): Recording length in minutes
+            num_behaviors (int): Number of behavior states (default: 6)
+            target_fps (int): Target framerate after downsampling (default: 20)
         """
         self.model_path = model_path
         self.num_behaviors = num_behaviors
-        self.original_fps = original_fps
         self.target_fps = target_fps
-        self.recording_length_min = recording_length_min
-
-        # Calculate expected frame counts
-        self.expected_frames_original = original_fps * recording_length_min * 60
-        self.expected_frames_downsampled = target_fps * recording_length_min * 60
 
         # PCA model (loaded when needed)
         self.pca_model = None
 
-    def preprocess_single_file(self, csv_path: str) -> Dict:
+    def preprocess_single_file(self,
+                               csv_path: str,
+                               original_fps: float,
+                               recording_length_min: float) -> Dict:
         """
         Preprocess a single behavior CSV file (Section 1).
 
         This function:
         1. Loads the CSV file
         2. Validates format
-        3. Pads/truncates to expected length
+        3. Pads/truncates to expected length (based on recording_length_min and original_fps)
         4. Downsamples from original_fps to target_fps
         5. Calculates behavior metrics:
            - Fraction occupancy (% time in each state)
@@ -94,6 +91,8 @@ class LupeAmpsAnalysis:
 
         Args:
             csv_path (str): Path to behavior CSV file
+            original_fps (float): Original recording framerate (read from summary CSV)
+            recording_length_min (float): Recording duration in minutes (read from summary CSV)
 
         Returns:
             dict: Dictionary containing:
@@ -106,6 +105,10 @@ class LupeAmpsAnalysis:
         Raises:
             ValueError: If CSV format is invalid
         """
+        # Calculate expected frame counts based on parameters
+        expected_frames_original = int(original_fps * recording_length_min * 60)
+        expected_frames_downsampled = int(self.target_fps * recording_length_min * 60)
+
         # Validate CSV
         is_valid, error_msg = validate_behavior_csv(csv_path)
         if not is_valid:
@@ -116,34 +119,34 @@ class LupeAmpsAnalysis:
         behavior_array = df['behavior_id'].to_numpy()
 
         # Pad or truncate to expected length
-        if len(behavior_array) < self.expected_frames_original:
+        if len(behavior_array) < expected_frames_original:
             # Pad with zeros
             behavior_array = np.pad(
                 behavior_array,
-                (0, self.expected_frames_original - len(behavior_array)),
+                (0, expected_frames_original - len(behavior_array)),
                 mode='constant',
                 constant_values=0
             )
         else:
             # Truncate
-            behavior_array = behavior_array[:self.expected_frames_original]
+            behavior_array = behavior_array[:expected_frames_original]
 
         # Downsample
         downsampled = downsample_sequence(
             behavior_array,
-            self.original_fps,
+            original_fps,
             self.target_fps
         )
 
         # Ensure exact length after downsampling
-        if len(downsampled) < self.expected_frames_downsampled:
+        if len(downsampled) < expected_frames_downsampled:
             downsampled = np.pad(
                 downsampled,
-                (0, self.expected_frames_downsampled - len(downsampled)),
+                (0, expected_frames_downsampled - len(downsampled)),
                 mode='constant'
             )
-        elif len(downsampled) > self.expected_frames_downsampled:
-            downsampled = downsampled[:self.expected_frames_downsampled]
+        elif len(downsampled) > expected_frames_downsampled:
+            downsampled = downsampled[:expected_frames_downsampled]
 
         # Calculate metrics for each behavior state
         occupancy = np.zeros(self.num_behaviors)
@@ -506,15 +509,37 @@ class LupeAmpsAnalysis:
             log("Section 1: Preprocessing and Metrics Calculation")
             log("=" * 60)
 
+            # Import summary reader
+            from src.utils.amps_summary_reader import read_parameters_from_summary
+
             all_metrics = []
             for i, csv_file in enumerate(csv_files, 1):
                 log(f"  [{i}/{len(csv_files)}] Processing {Path(csv_file).name}...")
                 try:
-                    metrics = self.preprocess_single_file(csv_file)
+                    # Read parameters from summary CSV
+                    log(f"    Reading parameters from summary CSV...")
+                    params = read_parameters_from_summary(csv_file)
+
+                    # Log detected parameters
+                    log(f"    Recording Length: {params['recording_length_min']:.1f} min")
+                    log(f"    Original Framerate: {params['original_fps']:.0f} fps")
+                    log(f"    Total Frames: {params['total_frames']:,}")
+                    log(f"    Target Framerate: {self.target_fps} fps")
+
+                    # Preprocess with detected parameters
+                    metrics = self.preprocess_single_file(
+                        csv_file,
+                        original_fps=params['original_fps'],
+                        recording_length_min=params['recording_length_min']
+                    )
                     all_metrics.append(metrics)
-                    log(f"    ✓ Complete")
+                    log(f"    Complete")
+                except FileNotFoundError as e:
+                    log(f"    Error: {str(e)}")
+                    log(f"    Please ensure LUPE analysis was run to generate summary CSV.")
+                    continue
                 except Exception as e:
-                    log(f"    ✗ Error: {str(e)}")
+                    log(f"    Error: {str(e)}")
                     continue
 
             results['section1'] = all_metrics
@@ -535,7 +560,7 @@ class LupeAmpsAnalysis:
             df_summary = pd.DataFrame(summary_data)
             summary_path = section1_dir / "metrics_all_files.csv"
             df_summary.to_csv(summary_path, index=False)
-            log(f"✓ Section 1 complete. Saved: {summary_path}")
+            log(f"[OK] Section 1 complete. Saved: {summary_path}")
             results['section1_csv'] = str(summary_path)
 
         # Section 2: PCA Projection
@@ -549,14 +574,14 @@ class LupeAmpsAnalysis:
 
             log("  Projecting to pain scale...")
             pc_coordinates = self.project_to_pain_scale(occupancy_array)
-            log("  ✓ Projection complete")
+            log("  [OK] Projection complete")
 
             section2_dir = output_base / f"{project_name}_LUPE-AMPS" / "Section2_pain_scale"
             section2_dir.mkdir(parents=True, exist_ok=True)
 
             output_path = section2_dir / "pain_scale_projection"
             self.create_pca_scatter_plot(pc_coordinates, filenames, str(output_path))
-            log(f"✓ Section 2 complete. Saved: {output_path}.png/svg/csv")
+            log(f"[OK] Section 2 complete. Saved: {output_path}.png/svg/csv")
             results['section2_plot'] = str(output_path)
 
         # Section 3: Metrics Visualization
@@ -567,7 +592,7 @@ class LupeAmpsAnalysis:
 
             section3_dir = output_base / f"{project_name}_LUPE-AMPS" / "Section3_behavior_metrics"
             self.create_metrics_plots(all_metrics, str(section3_dir), project_name)
-            log(f"✓ Section 3 complete. Saved: {section3_dir}/")
+            log(f"[OK] Section 3 complete. Saved: {section3_dir}/")
             results['section3_dir'] = str(section3_dir)
 
         # Section 4: Model Fit Analysis
@@ -581,7 +606,7 @@ class LupeAmpsAnalysis:
 
             section4_dir = output_base / f"{project_name}_LUPE-AMPS" / "Section4_model_fit"
             self.analyze_model_fit(sequences, filenames, str(section4_dir), project_name)
-            log(f"✓ Section 4 complete. Saved: {section4_dir}/")
+            log(f"[OK] Section 4 complete. Saved: {section4_dir}/")
             results['section4_dir'] = str(section4_dir)
 
         log("\n" + "=" * 60)

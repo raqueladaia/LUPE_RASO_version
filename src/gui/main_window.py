@@ -16,20 +16,20 @@ Output Structure:
     └── mouse01/                          # Partial name extracted before "DLC"
         ├── mouse01_behaviors.csv         # Frame-by-frame behavior classifications
         ├── mouse01_time.csv              # Time vector for each frame
-        └── mouse01_controls/             # Analysis results subfolder
-            ├── mouse01_instance_counts_summary.csv
-            ├── mouse01_instance_counts_raw.csv
-            ├── mouse01_instance_counts.svg
-            ├── mouse01_total_frames_summary.csv
-            ├── mouse01_total_frames_per_file.csv
-            ├── mouse01_total_frames_pie.svg
+        ├── mouse01_summary.csv           # Recording metadata and behavior statistics
+        └── mouse01_analysis/             # Analysis results subfolder
+            ├── mouse01_ANALYSIS_SUMMARY.csv
+            ├── mouse01_bout_counts_summary.csv
+            ├── mouse01_bout_counts.svg
+            ├── mouse01_time_distribution_overall.csv
+            ├── mouse01_time_distribution.svg
             ├── mouse01_bout_durations_statistics.csv
             ├── mouse01_bout_durations_raw.csv
-            ├── mouse01_bout_durations_boxplot.svg
-            ├── mouse01_binned_timeline_1.0min.csv
-            ├── mouse01_binned_timeline_1.0min.svg
-            ├── mouse01_transition_matrix.csv
-            └── mouse01_transition_matrix_heatmap.svg
+            ├── mouse01_bout_durations.svg
+            ├── mouse01_timeline_1.0min.csv
+            ├── mouse01_timeline_1.0min.svg
+            ├── mouse01_transitions_matrix.csv
+            └── mouse01_transitions_heatmap.svg
 
 Usage:
     from src.gui.main_window import LupeGUI
@@ -54,7 +54,9 @@ from src.core.analysis_total_frames import analyze_total_frames
 from src.core.analysis_durations import analyze_bout_durations
 from src.core.analysis_binned_timeline import analyze_binned_timeline
 from src.core.analysis_transitions import analyze_transitions
+from src.core.file_summary import generate_dlc_summary
 from src.utils.config_manager import get_config
+from src.utils.master_summary import create_analysis_summary
 
 
 def extract_partial_filename(csv_path: str) -> str:
@@ -368,7 +370,7 @@ class LupeGUI:
             # Load model once for all files
             self._log(f"\nLoading model from: {self.model_path}")
             model = load_model(self.model_path)
-            self._log("✓ Model loaded")
+            self._log("[OK] Model loaded")
 
             # Get base output directory
             base_output_dir = Path(self.output_dir_var.get())
@@ -399,11 +401,11 @@ class LupeGUI:
                         likelihood_threshold=self.llh_var.get(),
                         save_output=False
                     )
-                    self._log(f"  ✓ Preprocessed shape: {pose_data.shape}")
+                    self._log(f"  [OK] Preprocessed shape: {pose_data.shape}")
                     current_step += 1
                     self._update_progress((current_step / total_steps) * 100)
                 except Exception as e:
-                    self._log(f"  ✗ Preprocessing error: {str(e)}")
+                    self._log(f"  [ERROR] Preprocessing error: {str(e)}")
                     self._log(f"  Skipping {csv_file.name}")
                     current_step += (2 + len(selected_analyses))  # Skip all steps for this file
                     continue
@@ -412,12 +414,12 @@ class LupeGUI:
                 self._log(f"\n[Step 2] Classifying behaviors...")
                 try:
                     predictions = classify_behaviors(model, [pose_data])[0]
-                    self._log(f"  ✓ Classified {len(predictions)} frames")
-                    self._log(f"  ✓ Found {len(np.unique(predictions))} unique behaviors")
+                    self._log(f"  [OK] Classified {len(predictions)} frames")
+                    self._log(f"  [OK] Found {len(np.unique(predictions))} unique behaviors")
                     current_step += 1
                     self._update_progress((current_step / total_steps) * 100)
                 except Exception as e:
-                    self._log(f"  ✗ Classification error: {str(e)}")
+                    self._log(f"  [ERROR] Classification error: {str(e)}")
                     self._log(f"  Skipping {csv_file.name}")
                     current_step += (1 + len(selected_analyses))  # Skip remaining steps for this file
                     continue
@@ -425,9 +427,9 @@ class LupeGUI:
                 # Step 3: Create output folder structure
                 partial_name = extract_partial_filename(str(csv_path))
                 file_output_dir = base_output_dir / partial_name
-                controls_dir = file_output_dir / f"{partial_name}_controls"
+                analysis_dir = file_output_dir / f"{partial_name}_analysis"
                 file_output_dir.mkdir(parents=True, exist_ok=True)
-                controls_dir.mkdir(parents=True, exist_ok=True)
+                analysis_dir.mkdir(parents=True, exist_ok=True)
 
                 self._log(f"\n[Step 3] Saving outputs to: {file_output_dir}")
 
@@ -438,7 +440,7 @@ class LupeGUI:
                     'behavior_id': predictions
                 })
                 df_behaviors.to_csv(behaviors_csv_path, index=False)
-                self._log(f"  ✓ Saved: {behaviors_csv_path.name}")
+                self._log(f"  [OK] Saved: {behaviors_csv_path.name}")
 
                 # Save time vector CSV (frame, time_seconds)
                 time_csv_path = file_output_dir / f"{partial_name}_time.csv"
@@ -448,70 +450,85 @@ class LupeGUI:
                     'time_seconds': time_seconds
                 })
                 df_time.to_csv(time_csv_path, index=False)
-                self._log(f"  ✓ Saved: {time_csv_path.name}")
+                self._log(f"  [OK] Saved: {time_csv_path.name}")
+
+                # Generate file summary with metadata and behavior statistics
+                try:
+                    # Load DLC CSV headers to extract keypoint information
+                    # We only need to read the header rows (first 4 rows) for efficiency
+                    dlc_df_headers = pd.read_csv(str(csv_path), header=[0, 1, 2], nrows=0)
+
+                    # Get behavior names from config
+                    behavior_names = config.get_behavior_names()
+
+                    # Generate summary
+                    summary_path = generate_dlc_summary(
+                        dlc_df=dlc_df_headers,
+                        predictions=predictions,
+                        framerate=framerate,
+                        file_path=str(csv_path),
+                        output_dir=str(file_output_dir),
+                        behavior_names=behavior_names
+                    )
+                    self._log(f"  [OK] Saved: {Path(summary_path).name}")
+                except Exception as e:
+                    self._log(f"  [WARNING] Could not generate summary: {str(e)}")
 
                 # Create single-file behaviors dictionary for analysis functions
                 behaviors_dict = {partial_name: predictions}
 
                 # Run selected analyses
-                self._log(f"\n[Step 4] Running analyses in controls folder...")
+                self._log(f"\n[Step 4] Running analyses...")
                 bin_minutes = self.bin_minutes_var.get()
 
                 if self.analyses['instance_counts'].get():
                     try:
-                        self._log(f"  - Instance counts...")
-                        # Modify output filenames to include prefix
-                        analyze_instance_counts(behaviors_dict, str(controls_dir))
-                        # Rename output files to add prefix
-                        self._rename_with_prefix(controls_dir, partial_name, 'instance_counts')
-                        self._log(f"    ✓ Complete")
+                        self._log(f"  - Bout counts...")
+                        analyze_instance_counts(behaviors_dict, str(analysis_dir), file_prefix=partial_name)
+                        self._log(f"    [OK] Complete")
                     except Exception as e:
-                        self._log(f"    ✗ Error: {str(e)}")
+                        self._log(f"    [ERROR] {str(e)}")
                     current_step += 1
                     self._update_progress((current_step / total_steps) * 100)
 
                 if self.analyses['total_frames'].get():
                     try:
-                        self._log(f"  - Total frames...")
-                        analyze_total_frames(behaviors_dict, str(controls_dir))
-                        self._rename_with_prefix(controls_dir, partial_name, 'total_frames')
-                        self._log(f"    ✓ Complete")
+                        self._log(f"  - Time distribution...")
+                        analyze_total_frames(behaviors_dict, str(analysis_dir), file_prefix=partial_name)
+                        self._log(f"    [OK] Complete")
                     except Exception as e:
-                        self._log(f"    ✗ Error: {str(e)}")
+                        self._log(f"    [ERROR] {str(e)}")
                     current_step += 1
                     self._update_progress((current_step / total_steps) * 100)
 
                 if self.analyses['durations'].get():
                     try:
                         self._log(f"  - Bout durations...")
-                        analyze_bout_durations(behaviors_dict, str(controls_dir))
-                        self._rename_with_prefix(controls_dir, partial_name, 'bout_durations')
-                        self._log(f"    ✓ Complete")
+                        analyze_bout_durations(behaviors_dict, str(analysis_dir), file_prefix=partial_name)
+                        self._log(f"    [OK] Complete")
                     except Exception as e:
-                        self._log(f"    ✗ Error: {str(e)}")
+                        self._log(f"    [ERROR] {str(e)}")
                     current_step += 1
                     self._update_progress((current_step / total_steps) * 100)
 
                 if self.analyses['timeline'].get():
                     try:
-                        self._log(f"  - Binned timeline...")
-                        analyze_binned_timeline(behaviors_dict, str(controls_dir),
-                                              bin_size_minutes=bin_minutes)
-                        self._rename_with_prefix(controls_dir, partial_name, 'binned_timeline')
-                        self._log(f"    ✓ Complete")
+                        self._log(f"  - Timeline...")
+                        analyze_binned_timeline(behaviors_dict, str(analysis_dir),
+                                              bin_size_minutes=bin_minutes, file_prefix=partial_name)
+                        self._log(f"    [OK] Complete")
                     except Exception as e:
-                        self._log(f"    ✗ Error: {str(e)}")
+                        self._log(f"    [ERROR] {str(e)}")
                     current_step += 1
                     self._update_progress((current_step / total_steps) * 100)
 
                 if self.analyses['transitions'].get():
                     try:
                         self._log(f"  - Behavior transitions...")
-                        analyze_transitions(behaviors_dict, str(controls_dir))
-                        self._rename_with_prefix(controls_dir, partial_name, 'transition')
-                        self._log(f"    ✓ Complete")
+                        analyze_transitions(behaviors_dict, str(analysis_dir), file_prefix=partial_name)
+                        self._log(f"    [OK] Complete")
                     except Exception as e:
-                        self._log(f"    ✗ Error: {str(e)}")
+                        self._log(f"    [ERROR] {str(e)}")
                     current_step += 1
                     self._update_progress((current_step / total_steps) * 100)
 
@@ -520,7 +537,20 @@ class LupeGUI:
                     current_step += 1
                     self._update_progress((current_step / total_steps) * 100)
 
-                self._log(f"✓ Completed processing: {csv_file.name}")
+                # Create master summary if any analyses were run
+                if any([self.analyses[key].get() for key in ['instance_counts', 'total_frames', 'durations', 'transitions']]):
+                    try:
+                        self._log(f"\n[Step 5] Creating master summary...")
+                        create_analysis_summary(
+                            file_prefix=partial_name,
+                            analysis_dir=str(analysis_dir),
+                            behavior_names=config.get_behavior_names()
+                        )
+                        self._log(f"  [OK] Master summary created")
+                    except Exception as e:
+                        self._log(f"  [WARNING] Could not create master summary: {str(e)}")
+
+                self._log(f"[OK] Completed processing: {csv_file.name}")
 
             self._log("\n" + "=" * 60)
             self._log("All analyses completed successfully!")
@@ -535,7 +565,7 @@ class LupeGUI:
 
         except Exception as e:
             error_msg = f"Error during analysis: {str(e)}"
-            self._log(f"\n✗ {error_msg}")
+            self._log(f"\n[ERROR] {error_msg}")
             import traceback
             self._log(traceback.format_exc())
             self.root.after(0, lambda: messagebox.showerror("Error", error_msg))

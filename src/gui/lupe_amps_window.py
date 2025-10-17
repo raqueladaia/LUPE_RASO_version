@@ -55,8 +55,8 @@ class LupeAmpsGUI:
         # Configure grid weights for resizing
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(0, weight=1)  # Left column
-        main_frame.columnconfigure(1, weight=2)  # Right column (larger for log)
+        main_frame.columnconfigure(0, weight=2)  # Left column (increased from 1 to 2)
+        main_frame.columnconfigure(1, weight=3)  # Right column (reduced from 2 to 3, giving 60% instead of 67%)
 
         # ========== Title ==========
         title_label = ttk.Label(
@@ -93,23 +93,13 @@ class LupeAmpsGUI:
         files_frame = ttk.LabelFrame(scrollable_frame, text="Input Files", padding="10")
         files_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
 
-        # Single file entry (for direct path input)
-        ttk.Label(files_frame, text="Add single file (paste path):").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.single_file_var = tk.StringVar()
-        ttk.Entry(files_frame, textvariable=self.single_file_var, width=35).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5)
-        ttk.Button(files_frame, text="Add", command=self._add_single_file).grid(row=0, column=2, padx=2)
-        files_frame.columnconfigure(1, weight=1)
-
-        # OR separator
-        ttk.Label(files_frame, text="OR", font=('Arial', 9, 'italic')).grid(row=1, column=0, columnspan=3, pady=5)
-
-        # File list with scrollbar (for multiple files)
-        ttk.Label(files_frame, text="Selected files:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        # File list with scrollbar
+        ttk.Label(files_frame, text="Selected files:").grid(row=0, column=0, sticky=tk.W, pady=2)
         list_frame = ttk.Frame(files_frame)
-        list_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
-        files_frame.rowconfigure(3, weight=1)
+        list_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        files_frame.rowconfigure(1, weight=1)
 
-        self.file_listbox = tk.Listbox(list_frame, height=6, selectmode=tk.EXTENDED)
+        self.file_listbox = tk.Listbox(list_frame, height=6, width=50, selectmode=tk.EXTENDED)
         scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.file_listbox.yview)
         self.file_listbox.configure(yscrollcommand=scrollbar.set)
 
@@ -120,7 +110,7 @@ class LupeAmpsGUI:
 
         # File buttons
         btn_frame = ttk.Frame(files_frame)
-        btn_frame.grid(row=4, column=0, columnspan=3, pady=5)
+        btn_frame.grid(row=2, column=0, columnspan=3, pady=5)
 
         ttk.Button(btn_frame, text="Browse Multiple...", command=self._add_files).pack(side=tk.LEFT, padx=2)
         ttk.Button(btn_frame, text="Remove Selected", command=self._remove_files).pack(side=tk.LEFT, padx=2)
@@ -128,7 +118,7 @@ class LupeAmpsGUI:
 
         # File count label
         self.file_count_var = tk.StringVar(value="0 file(s) selected")
-        ttk.Label(files_frame, textvariable=self.file_count_var).grid(row=5, column=0, columnspan=3, pady=5)
+        ttk.Label(files_frame, textvariable=self.file_count_var).grid(row=3, column=0, columnspan=3, pady=5)
 
         # ========== Model Selection (Scrollable Left Column) ==========
         model_frame = ttk.LabelFrame(scrollable_frame, text="Model", padding="10")
@@ -146,23 +136,22 @@ class LupeAmpsGUI:
         params_frame = ttk.LabelFrame(scrollable_frame, text="Parameters", padding="10")
         params_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
 
-        ttk.Label(params_frame, text="Recording Length (min):").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.rec_length_var = tk.IntVar(value=30)
-        ttk.Spinbox(params_frame, from_=1, to=120, textvariable=self.rec_length_var, width=10).grid(
+        # Target Framerate (only user-editable parameter)
+        # Recording Length and Original Framerate are auto-detected from summary CSVs
+        ttk.Label(params_frame, text="Target Framerate (fps):").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.target_fps_var = tk.IntVar(value=20)
+        ttk.Spinbox(params_frame, from_=1, to=240, textvariable=self.target_fps_var, width=10).grid(
             row=0, column=1, sticky=tk.W, padx=5
         )
 
-        ttk.Label(params_frame, text="Original Framerate (fps):").grid(row=1, column=0, sticky=tk.W, pady=2)
-        self.original_fps_var = tk.IntVar(value=60)
-        ttk.Spinbox(params_frame, from_=1, to=240, textvariable=self.original_fps_var, width=10).grid(
-            row=1, column=1, sticky=tk.W, padx=5
+        # Add info label explaining auto-detection
+        info_label = ttk.Label(
+            params_frame,
+            text="Note: Recording length and original framerate will be auto-detected\nfrom summary CSV files during analysis.",
+            font=('Arial', 8, 'italic'),
+            foreground='gray'
         )
-
-        ttk.Label(params_frame, text="Target Framerate (fps):").grid(row=2, column=0, sticky=tk.W, pady=2)
-        self.target_fps_var = tk.IntVar(value=20)
-        ttk.Spinbox(params_frame, from_=1, to=240, textvariable=self.target_fps_var, width=10).grid(
-            row=2, column=1, sticky=tk.W, padx=5
-        )
+        info_label.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
 
         # ========== Output Settings (Scrollable Left Column) ==========
         output_frame = ttk.LabelFrame(scrollable_frame, text="Output Settings", padding="10")
@@ -242,37 +231,13 @@ class LupeAmpsGUI:
         self.log_text = scrolledtext.ScrolledText(
             log_frame,
             height=30,
-            width=60,
+            width=54,
             state='disabled',
             wrap=tk.WORD
         )
         self.log_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
         log_frame.rowconfigure(1, weight=1)
         log_frame.columnconfigure(0, weight=1)
-
-    def _add_single_file(self):
-        """Add a single file from the text entry field."""
-        file_path = self.single_file_var.get().strip()
-
-        if not file_path:
-            messagebox.showwarning("Warning", "Please enter a file path.")
-            return
-
-        # Check if file exists
-        if not Path(file_path).exists():
-            messagebox.showerror("Error", f"File not found:\n{file_path}")
-            return
-
-        # Add to list if not already present
-        if file_path not in self.csv_files:
-            self.csv_files.append(file_path)
-            self.file_listbox.insert(tk.END, Path(file_path).name)
-            self._update_file_count()
-            self._log(f"Added: {Path(file_path).name}")
-            # Clear the entry field
-            self.single_file_var.set("")
-        else:
-            messagebox.showinfo("Info", "File is already in the list.")
 
     def _add_files(self):
         """Open file dialog to add CSV files."""
@@ -399,12 +364,12 @@ class LupeAmpsGUI:
             selected_sections = [num for num, var in self.sections.items() if var.get()]
 
             # Create analysis object
+            # Note: Recording length and original framerate are now auto-detected
+            # from summary CSV files for each file individually
             analysis = LupeAmpsAnalysis(
                 model_path=self.model_path,
                 num_behaviors=6,
-                original_fps=self.original_fps_var.get(),
-                target_fps=self.target_fps_var.get(),
-                recording_length_min=self.rec_length_var.get()
+                target_fps=self.target_fps_var.get()
             )
 
             # Run complete analysis
@@ -430,7 +395,7 @@ class LupeAmpsGUI:
 
         except Exception as e:
             error_msg = f"Error during analysis: {str(e)}"
-            self._log(f"\n✗ {error_msg}")
+            self._log(f"\n[ERROR] {error_msg}")
             import traceback
             self._log(traceback.format_exc())
             self.root.after(0, lambda: messagebox.showerror("Error", error_msg))

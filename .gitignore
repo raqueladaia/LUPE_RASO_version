@@ -49,6 +49,7 @@ outputs/
 .DS_Store
 Thumbs.db
 desktop.ini
+nul
 
 # Data files (typically large)
 data/*.npy

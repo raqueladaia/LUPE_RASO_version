@@ -67,26 +67,28 @@ def analyze_total_frames(behaviors: Dict[str, np.ndarray],
                          behavior_names: list = None,
                          behavior_colors: list = None,
                          create_plots: bool = True,
-                         save_csv: bool = True) -> Dict:
+                         save_csv: bool = True,
+                         file_prefix: str = None) -> Dict:
     """
-    Analyze total frames spent in each behavior across all files.
+    Analyze total frames spent in each behavior for a single file.
 
-    Creates pie charts showing behavior distribution for the dataset.
+    Creates pie chart showing behavior distribution.
 
     Args:
-        behaviors (dict): Dictionary mapping file names to behavior arrays
+        behaviors (dict): Dictionary mapping file name to behavior array (single file)
         output_dir (str): Directory for output files
         behavior_names (list, optional): Behavior names
         behavior_colors (list, optional): Colors for visualization
         create_plots (bool): Whether to create plots
         save_csv (bool): Whether to save CSV files
+        file_prefix (str, optional): Prefix for output filenames
 
     Returns:
         dict: Analysis results
 
     Example:
-        >>> behaviors = {'file1': array1, 'file2': array2}
-        >>> results = analyze_total_frames(behaviors, 'outputs/total_frames/')
+        >>> behaviors = {'mouse01': array1}
+        >>> results = analyze_total_frames(behaviors, 'outputs/mouse01_analysis/', file_prefix='mouse01')
     """
     # Get configuration
     config = get_config()
@@ -99,45 +101,39 @@ def analyze_total_frames(behaviors: Dict[str, np.ndarray],
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Combine all behavior data
-    all_predictions = np.hstack([behavior_array for behavior_array in behaviors.values()])
+    # Get the single file (should only be one)
+    if len(behaviors) != 1:
+        raise ValueError(f"Expected single file, got {len(behaviors)} files")
 
-    # Calculate overall percentages
-    overall_df = calculate_frame_percentages(all_predictions, behavior_names)
+    file_name, behavior_array = next(iter(behaviors.items()))
+
+    # Use file_prefix if provided, otherwise use file_name
+    if file_prefix is None:
+        file_prefix = file_name
+
+    # Calculate percentages for this file
+    percentages_df = calculate_frame_percentages(behavior_array, behavior_names)
 
     results = {
-        'overall_percentages': overall_df
+        'percentages': percentages_df
     }
 
     # Save CSV
     if save_csv:
-        # Overall summary
-        csv_path = output_path / 'total_frames_summary.csv'
-        overall_df.to_csv(csv_path, index=False)
-        results['csv_summary_path'] = str(csv_path)
+        csv_path = output_path / f'{file_prefix}_time_distribution_overall.csv'
+        percentages_df.to_csv(csv_path, index=False)
+        results['csv_path'] = str(csv_path)
 
-        # Per-file breakdown
-        per_file_data = []
-        for file_name, behavior_array in behaviors.items():
-            file_df = calculate_frame_percentages(behavior_array, behavior_names)
-            file_df.insert(0, 'file', file_name)
-            per_file_data.append(file_df)
-
-        per_file_df = pd.concat(per_file_data, ignore_index=True)
-        per_file_path = output_path / 'total_frames_per_file.csv'
-        per_file_df.to_csv(per_file_path, index=False)
-        results['csv_per_file_path'] = str(per_file_path)
-
-        print(f'CSV files saved to: {output_dir}')
+        print(f'Time distribution CSV saved to: {csv_path}')
 
     # Create plot
     if create_plots:
-        plot_path = output_path / 'total_frames_pie.svg'
+        plot_path = output_path / f'{file_prefix}_time_distribution.svg'
         fig = plot_behavior_pie(
-            overall_df['frames'].values,
-            overall_df['behavior'].tolist(),
+            percentages_df['frames'].values,
+            percentages_df['behavior'].tolist(),
             colors=behavior_colors,
-            title='Behavior Distribution (Total Frames)'
+            title='Behavior Distribution (Time %)'
         )
         save_figure(fig, str(plot_path))
         results['plot_path'] = str(plot_path)
