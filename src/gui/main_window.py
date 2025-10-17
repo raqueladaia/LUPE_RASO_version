@@ -114,6 +114,9 @@ class LupeGUI:
         # Create GUI components
         self._create_widgets()
 
+        # Initialize default model path
+        self._initialize_default_model()
+
         # Load configuration
         self.config = get_config()
 
@@ -146,25 +149,25 @@ class LupeGUI:
 
         # DLC CSV files
         ttk.Label(file_frame, text="DLC CSV Files:").grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.dlc_path_var = tk.StringVar(value="No files selected")
-        ttk.Label(file_frame, textvariable=self.dlc_path_var, foreground="gray").grid(row=0, column=1, sticky=tk.W, padx=5)
+        self.dlc_path_var = tk.StringVar(master=self.root, value="No files selected")
+        ttk.Entry(file_frame, textvariable=self.dlc_path_var, width=30).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5)
         ttk.Button(file_frame, text="Browse...", command=self._select_dlc_files).grid(row=0, column=2, sticky=tk.W, padx=(5, 0))
 
         # Model file
         ttk.Label(file_frame, text="Model File:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.model_path_var = tk.StringVar(value="No file selected")
-        ttk.Label(file_frame, textvariable=self.model_path_var, foreground="gray").grid(row=1, column=1, sticky=tk.W, padx=5)
+        self.model_path_var = tk.StringVar(master=self.root, value="models/model_LUPE.pkl")
+        ttk.Entry(file_frame, textvariable=self.model_path_var, width=30).grid(row=1, column=1, sticky=(tk.W, tk.E), padx=5)
         ttk.Button(file_frame, text="Browse...", command=self._select_model_file).grid(row=1, column=2, sticky=tk.W, padx=(5, 0))
 
         # Likelihood threshold
         ttk.Label(file_frame, text="Likelihood Threshold:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.llh_var = tk.DoubleVar(value=0.1)
+        self.llh_var = tk.DoubleVar(master=self.root, value=0.1)
         ttk.Spinbox(file_frame, from_=0.0, to=1.0, increment=0.05,
                    textvariable=self.llh_var, width=10).grid(row=2, column=1, sticky=tk.W, padx=5)
 
         # Output directory
         ttk.Label(file_frame, text="Output Directory:").grid(row=3, column=0, sticky=tk.W, pady=5)
-        self.output_dir_var = tk.StringVar(value="outputs/")
+        self.output_dir_var = tk.StringVar(master=self.root, value="outputs/")
         ttk.Entry(file_frame, textvariable=self.output_dir_var, width=30).grid(row=3, column=1, sticky=(tk.W, tk.E), padx=5)
         ttk.Button(file_frame, text="Browse...", command=self._select_output_dir).grid(row=3, column=2, sticky=tk.W, padx=(5, 0))
 
@@ -184,7 +187,7 @@ class LupeGUI:
         ]
 
         for i, (key, label) in enumerate(analyses_list):
-            var = tk.BooleanVar(value=True)
+            var = tk.BooleanVar(master=self.root, value=True)
             self.analyses[key] = var
             ttk.Checkbutton(analysis_frame, text=label, variable=var).grid(
                 row=i // 2, column=i % 2, sticky=tk.W, padx=10, pady=2
@@ -201,7 +204,7 @@ class LupeGUI:
         options_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=5, padx=(0, 5))
 
         ttk.Label(options_frame, text="Timeline Bin Size (minutes):").grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.bin_minutes_var = tk.DoubleVar(value=1.0)
+        self.bin_minutes_var = tk.DoubleVar(master=self.root, value=1.0)
         ttk.Spinbox(options_frame, from_=0.5, to=10.0, increment=0.5,
                    textvariable=self.bin_minutes_var, width=10).grid(row=0, column=1, sticky=tk.W, padx=5)
 
@@ -226,7 +229,7 @@ class LupeGUI:
         main_frame.rowconfigure(1, weight=1)
 
         # Progress bar
-        self.progress_var = tk.DoubleVar()
+        self.progress_var = tk.DoubleVar(master=self.root)
         self.progress_bar = ttk.Progressbar(
             log_frame,
             variable=self.progress_var,
@@ -247,6 +250,19 @@ class LupeGUI:
         self.log_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
         log_frame.rowconfigure(1, weight=1)
         log_frame.columnconfigure(0, weight=1)
+
+    def _initialize_default_model(self):
+        """Initialize default model path if file exists."""
+        # Construct full path relative to project root
+        default_model_relative = "models/model_LUPE.pkl"
+        default_model_path = Path(__file__).parent.parent.parent / default_model_relative
+
+        # Check if model file exists and set path silently
+        if default_model_path.exists():
+            self.model_path = str(default_model_path)
+        else:
+            # Model doesn't exist - keep None
+            self.model_path = None
 
     def _select_dlc_files(self):
         """Open file dialog to select DLC CSV files."""
