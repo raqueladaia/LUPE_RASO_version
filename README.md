@@ -2,7 +2,7 @@
 
 A comprehensive, user-friendly analysis tool for LUPE (Light aUtomated Pain Evaluator) behavioral data. This tool converts Jupyter notebook-based analysis workflows into a modular application with both GUI and CLI interfaces.
 
-> **New to LUPE?** Start with [GETTING_STARTED.md](GETTING_STARTED.md) for a step-by-step tutorial.
+> **New to LUPE?** Jump to [Quick Start](#quick-start) to get running in minutes, or see [Installation](#installation) for detailed setup instructions.
 
 ## Features
 
@@ -46,7 +46,31 @@ A comprehensive, user-friendly analysis tool for LUPE (Light aUtomated Pain Eval
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- **Python 3.11.x** (specifically 3.11.9 recommended)
+  - **CRITICAL**: Python 3.13+ has compatibility issues with scikit-learn 1.2.1
+  - Python 3.12 may work but is not tested
+  - Python 3.11.x is the recommended and tested version
+
+  **Check if you already have Python 3.11 installed:**
+  ```bash
+  # Windows - List all installed Python versions
+  py --list
+  # Look for "3.11" in the output
+
+  # Or check Python 3.11 specifically:
+  py -3.11 --version
+
+  # macOS/Linux:
+  python3.11 --version
+  ```
+
+  **If Python 3.11 is NOT installed**, download it from:
+  - Windows: https://www.python.org/downloads/release/python-3119/
+  - macOS: `brew install python@3.11`
+  - Ubuntu/Debian: `sudo apt install python3.11 python3.11-venv`
+
+  **Note:** Multiple Python versions can coexist on your system without conflicts. Installing Python 3.11 will not affect your existing Python 3.13 or other versions.
+
 - pip (Python package manager)
 
 ### ⚠️ IMPORTANT: Library Version Compatibility
@@ -61,6 +85,32 @@ This tool uses **specific library versions** that are compatible with the pre-tr
 
 **CRITICAL:** The pre-trained A-SOiD model was trained with scikit-learn 1.2.1 and is **INCOMPATIBLE** with newer versions (1.3.0+) due to breaking changes in decision tree internal structures. DO NOT upgrade sklearn or the model will fail to load.
 
+### Why These Specific Versions?
+
+**Understanding the Version Requirements:**
+
+This project requires specific Python and library versions due to a dependency chain:
+
+1. **Pre-trained Model Constraint**
+   - The LUPE A-SOiD model was trained using scikit-learn 1.2.1
+   - The model is saved in a pickle format that includes sklearn internal structures
+   - These internal structures changed in sklearn 1.3.0+ (added `missing_go_to_left` field)
+   - Result: **The model can ONLY be loaded with sklearn 1.2.1**
+
+2. **Python Version Constraint**
+   - scikit-learn 1.2.1 was released in early 2023 for Python 3.8-3.11
+   - Python 3.13+ (released late 2024) has breaking changes that cause issues with sklearn 1.2.1
+   - These include changes to the C API and internal memory management
+   - Result: **sklearn 1.2.1 works reliably only with Python 3.11.x or earlier**
+
+3. **Why We Can't Just Upgrade**
+   - Upgrading sklearn would require retraining the entire A-SOiD model
+   - This would require the original training dataset and weeks of computation
+   - The retrained model might produce different behavior classifications
+   - Result: **We must work within the constraints of the existing model**
+
+**Bottom Line:** Python 3.11.x + scikit-learn 1.2.1 is not a preference, it's a technical requirement imposed by the pre-trained model. Think of it as "frozen dependencies" needed to use the model.
+
 ### Steps
 
 1. **Clone or download this repository**
@@ -68,23 +118,72 @@ This tool uses **specific library versions** that are compatible with the pre-tr
    cd LUPE_analysis_RASO_version
    ```
 
-2. **Create a virtual environment (STRONGLY recommended)**
+2. **Create a virtual environment with Python 3.11 (REQUIRED)**
+
+   **IMPORTANT:** You must create the virtual environment using Python 3.11.x specifically, not your default Python version. If you haven't verified Python 3.11 is installed yet, go back to [Prerequisites](#prerequisites).
+
+   **On Windows:**
    ```bash
-   python -m venv env
+   # Create virtual environment using Python 3.11
+   py -3.11 -m venv env
 
-   # On Windows:
+   # Activate the environment
    env\Scripts\activate
+   ```
 
-   # On macOS/Linux:
+   **On macOS/Linux:**
+   ```bash
+   # Create virtual environment using Python 3.11
+   python3.11 -m venv env
+
+   # Activate the environment
    source env/bin/activate
    ```
 
-3. **Install dependencies with exact versions**
+   **Alternative method (using full path to Python 3.11):**
+
+   If the commands above don't work, you can find and use the full path to your Python 3.11 installation:
+
+   ```bash
+   # Find the full path to Python 3.11:
+   # Windows:
+   py -3.11 -c "import sys; print(sys.executable)"
+
+   # macOS/Linux:
+   which python3.11
+
+   # Then create venv using that path:
+   # Windows example:
+   "C:\Users\YourName\AppData\Local\Programs\Python\Python311\python.exe" -m venv env
+
+   # macOS/Linux example:
+   /usr/bin/python3.11 -m venv env
+   ```
+
+3. **Verify the virtual environment is using Python 3.11 (CRITICAL STEP)**
+
+   After activating the virtual environment, verify you're using the correct Python version:
+
+   ```bash
+   python --version
+   ```
+
+   **Expected output:** `Python 3.11.9` (or any Python 3.11.x version)
+
+   **If you see Python 3.13.x or 3.12.x:**
+   - Your virtual environment was created with the wrong Python version
+   - Deactivate the environment: `deactivate`
+   - Delete the env folder: `rmdir /s env` (Windows) or `rm -rf env` (macOS/Linux)
+   - Go back to step 2 and use `py -3.11 -m venv env` or `python3.11 -m venv env`
+
+   **Why this matters:** Using the wrong Python version will cause sklearn 1.2.1 installation failures or runtime errors.
+
+4. **Install dependencies with exact versions**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Verify installation**
+5. **Verify installation**
    ```bash
    python -c "import sklearn; print(f'scikit-learn: {sklearn.__version__}')"
    # Should print: scikit-learn: 1.2.1
@@ -93,7 +192,7 @@ This tool uses **specific library versions** that are compatible with the pre-tr
    # Should print: NumPy: 1.26.4
    ```
 
-5. **Download the LUPE A-SOiD model**
+6. **Download the LUPE A-SOiD model**
    - Download from: [LUPE Model Link](https://upenn.box.com/s/9rfslrvcc7m6fji8bmgktnegghyu88b0)
    - Place the model file in a `models/` directory
 
@@ -180,7 +279,7 @@ The GUI provides a simple, point-and-click interface for running analyses.
 - Log window showing analysis status
 
 **Workflow:**
-1. Launch GUI: `python main_gui.py`
+1. Launch GUI: `python main_lupe_gui.py`
 2. Select behaviors file (previously classified data)
 3. Choose output directory
 4. Select which analyses to run
@@ -525,6 +624,69 @@ python -c "import sklearn, numpy; print(f'scikit-learn: {sklearn.__version__}');
   - Windows: Included with Python
   - macOS: `brew install python-tk`
   - Linux: `sudo apt-get install python3-tk`
+
+### Wrong Python Version in Virtual Environment
+
+**Problem:** Your virtual environment is using the wrong Python version (e.g., Python 3.13.x instead of 3.11.x)
+
+**Symptoms:**
+- `python --version` (inside venv) shows Python 3.13.x or 3.12.x
+- sklearn 1.2.1 fails to install
+- You get errors related to missing C extensions or compilation failures
+- Runtime errors when trying to load the model
+
+**Root Cause:** The virtual environment was created using your system's default Python (which is 3.13.x) instead of Python 3.11.x
+
+**Solution:**
+
+1. **Deactivate the current environment:**
+   ```bash
+   deactivate
+   ```
+
+2. **Delete the incorrect virtual environment:**
+   ```bash
+   # Windows:
+   rmdir /s env
+
+   # macOS/Linux:
+   rm -rf env
+   ```
+
+3. **Verify Python 3.11 is installed** (if you skipped [Prerequisites](#prerequisites)):
+   ```bash
+   # Windows:
+   py -3.11 --version
+
+   # macOS/Linux:
+   python3.11 --version
+   ```
+
+   If not installed, see the [Prerequisites](#prerequisites) section for installation instructions.
+
+4. **Create virtual environment with Python 3.11:**
+   ```bash
+   # Windows:
+   py -3.11 -m venv env
+   env\Scripts\activate
+
+   # macOS/Linux:
+   python3.11 -m venv env
+   source env/bin/activate
+   ```
+
+5. **Verify the correct version:**
+   ```bash
+   python --version
+   # Should output: Python 3.11.9 (or 3.11.x)
+   ```
+
+6. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+**Why this is critical:** Python 3.13+ has breaking changes that prevent scikit-learn 1.2.1 from working correctly, and scikit-learn 1.2.1 is required by the pre-trained LUPE model.
 
 ### Import errors
 - Ensure you're running from the project root directory

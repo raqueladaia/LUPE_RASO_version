@@ -4,7 +4,7 @@ LUPE Analysis Tool - GUI Entry Point
 This script launches the graphical user interface for LUPE analysis.
 
 Usage:
-    python main_gui.py
+    python main_lupe_gui.py
 
 The GUI provides an easy-to-use interface for:
 - Loading behavior data

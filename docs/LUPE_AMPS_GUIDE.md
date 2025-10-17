@@ -210,7 +210,7 @@ outputs/
 ### Step 1: Classify Behaviors (Main LUPE GUI)
 
 ```bash
-python main_gui.py
+python main_lupe_gui.py
 ```
 
 1. Load your DLC CSV files
@@ -352,7 +352,7 @@ The GUI version is simplified compared to the original LUPE-AMPS Jupyter noteboo
 
 ## Related Documentation
 
-- **Main LUPE GUI**: See `GETTING_STARTED.md` for behavior classification
+- **Main LUPE GUI**: See [README.md](../README.md#quick-start) Quick Start section for behavior classification
 - **Reference Repository**: Original LUPE-AMPS notebook in `reference_repo/`
 - **CLI Usage**: For command-line batch processing (coming soon)
 

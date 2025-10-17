@@ -23,8 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Preprocessing, classification, and analysis commands
   - Export functionality for CSV generation
 - **Comprehensive Documentation**:
-  - `README.md` - Project overview and installation
-  - `GETTING_STARTED.md` - Step-by-step tutorial
+  - `README.md` - Project overview, installation, and quick start
   - `docs/GUI_GUIDE.md` - GUI usage instructions
   - `docs/CLI_GUIDE.md` - CLI reference
   - `docs/ANALYSIS_TYPES.md` - Detailed analysis descriptions
@@ -60,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All controls now accessible
 
 ### Technical Details
-- Python 3.11+ required
+- Python 3.11.x required (3.11.9 recommended)
 - scikit-learn 1.2.1 (CRITICAL - do not upgrade)
 - numpy 1.26.4, pandas 2.2.2, scipy 1.13.0
 - Pre-trained models: model_LUPE.pkl (308MB), model_AMPS.pkl (1KB)

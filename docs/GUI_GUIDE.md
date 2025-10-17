@@ -17,7 +17,7 @@ This guide explains how to use the graphical user interface (GUI) for LUPE analy
 3. Activate your virtual environment (if using one)
 4. Run:
    ```bash
-   python main_gui.py
+   python main_lupe_gui.py
    ```
 
 The GUI window will appear with the title "LUPE Analysis Tool".

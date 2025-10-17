@@ -381,10 +381,8 @@ class LupeGUI:
 
                 # Step 2: Classify behaviors
                 self._log(f"\n[Step 2] Classifying behaviors...")
-                self._log(f"  [DEBUG] Starting feature extraction for {pose_data.shape[0]:,} frames...")
                 try:
                     predictions = classify_behaviors(model, [pose_data])[0]
-                    self._log(f"  [DEBUG] Feature extraction and prediction complete")
                     self._log(f"  [OK] Classified {len(predictions):,} frames")
                     self._log(f"  [OK] Found {len(np.unique(predictions))} unique behaviors")
                     current_step += 1
@@ -393,7 +391,6 @@ class LupeGUI:
                     # Explicitly free pose_data to release memory (critical for multi-file processing)
                     del pose_data
                     gc.collect()
-                    self._log(f"  [DEBUG] Memory released after classification")
 
                 except Exception as e:
                     self._log(f"  [ERROR] Classification error: {str(e)}")
