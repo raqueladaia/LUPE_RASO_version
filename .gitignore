@@ -33,9 +33,9 @@ ENV/
 *.swo
 *~
 
-# Claude Code
+# Development
 .claude/
-CLAUDE.md  # Internal development instructions, not for public distribution
+CLAUDE.md
 
 # Jupyter Notebook
 .ipynb_checkpoints

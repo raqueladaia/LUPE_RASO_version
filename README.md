@@ -390,7 +390,6 @@ LUPE_analysis_RASO_version/
 ├── main_cli.py              # CLI entry point
 ├── requirements.txt         # Python dependencies
 ├── README.md                # This file
-├── CLAUDE.md                # Project objectives and rules
 │
 ├── config/                  # Configuration files
 │   ├── metadata.json        # Behavior definitions, keypoints

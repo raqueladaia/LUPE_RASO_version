@@ -11,7 +11,7 @@ All cleanup is complete:
 - [x] Proper attribution in README.md
 - [x] LICENSE file created
 - [x] CHANGELOG.md created
-- [x] .gitignore configured (.claude/, CLAUDE.md, *.pkl)
+- [x] .gitignore configured (*.pkl excluded)
 - [x] Documentation complete
 
 ## 📋 Upload Strategy: Don't Track Large Model
@@ -68,10 +68,9 @@ git status
 ```
 
 **Expected output:**
-- ✅ CLAUDE.md should NOT appear (excluded by .gitignore)
 - ✅ model_AMPS.pkl should appear (force-added)
 - ❌ model_LUPE.pkl should NOT appear (excluded by .gitignore)
-- ✅ All other project files should appear
+- ✅ All project files should appear (check .gitignore for exclusions)
 
 If you see `models/model_LUPE.pkl` in the list, STOP and run:
 ```bash
@@ -126,7 +125,6 @@ git push -u origin main
    - ✅ LICENSE file is visible
    - ✅ models/model_AMPS.pkl is present (1.2 KB)
    - ❌ models/model_LUPE.pkl is NOT present (good!)
-   - ❌ CLAUDE.md is NOT present (good!)
 3. Check repository size (should be ~5-10 MB, not 300+ MB)
 
 ---
