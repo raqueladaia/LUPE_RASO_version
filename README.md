@@ -33,6 +33,7 @@ A comprehensive, user-friendly analysis tool for LUPE (Light aUtomated Pain Eval
   - [GUI Mode](#gui-mode)
   - [CLI Mode](#cli-mode)
 - [Analysis Types](#analysis-types)
+- [Output Files](#output-files)
 - [Configuration](#configuration)
 - [Project Structure](#project-structure)
 - [Troubleshooting](#troubleshooting)
@@ -259,7 +260,22 @@ Analyzes how behaviors transition from one to another.
 
 See `docs/ANALYSIS_TYPES.md` for complete descriptions.
 
-### 7. LUPE-AMPS Pain Scale Analysis
+### 7. File Summary
+Automatically generated for each analyzed file, containing recording metadata and behavior statistics.
+- Total frames, duration (seconds/minutes/hours), framerate
+- Keypoint information (count and names)
+- Behavior statistics (frame counts and percentages per behavior)
+- Output: `{filename}_summary.csv`
+
+### 8. Master Analysis Summary
+Consolidated summary combining all analysis results into a single file for quick reference.
+- Bout counts for all behaviors
+- Time distribution (percentages and frame counts)
+- Bout duration statistics (mean and median)
+- Top 5 behavior transitions with probabilities
+- Output: `{filename}_ANALYSIS_SUMMARY.csv`
+
+### 9. LUPE-AMPS Pain Scale Analysis
 
 The LUPE-AMPS (Advanced Multivariate Pain Scale) module provides specialized pain-related behavior analysis:
 
@@ -277,7 +293,13 @@ The LUPE-AMPS (Advanced Multivariate Pain Scale) module provides specialized pai
 
 **Inputs:**
 - Behavior CSV files with frame-by-frame classifications (output from LUPE classification)
+- Summary CSV files (for auto-detection of recording parameters)
 - Pre-trained PCA model (`models/model_AMPS.pkl`)
+
+**Auto-Detection Feature:**
+- Recording length and original framerate are automatically read from summary CSV files
+- No manual parameter entry required
+- Only target framerate (default: 20 fps) is user-configurable
 
 **Outputs:**
 - Pain scale coordinates (PC1/PC2) for each recording
@@ -286,6 +308,52 @@ The LUPE-AMPS (Advanced Multivariate Pain Scale) module provides specialized pai
 - Feature importance analysis
 
 See `docs/LUPE_AMPS_GUIDE.md` for complete usage instructions.
+
+## Output Files
+
+When you run LUPE analysis on a file (e.g., `mouse01DLC_resnet50.csv`), the following output structure is created:
+
+```
+outputs/
+└── mouse01/                              # Partial name (extracted before "DLC")
+    ├── mouse01_behaviors.csv             # Frame-by-frame behavior classifications
+    ├── mouse01_time.csv                  # Time vector (frame, time_seconds)
+    ├── mouse01_summary.csv               # Recording metadata & behavior statistics
+    └── mouse01_analysis/                 # Analysis results subfolder
+        ├── mouse01_ANALYSIS_SUMMARY.csv          # Master summary (all key metrics)
+        ├── mouse01_bout_counts_summary.csv
+        ├── mouse01_bout_counts.svg
+        ├── mouse01_time_distribution_overall.csv
+        ├── mouse01_time_distribution.svg
+        ├── mouse01_bout_durations_statistics.csv
+        ├── mouse01_bout_durations_raw.csv
+        ├── mouse01_bout_durations.svg
+        ├── mouse01_timeline_1.0min.csv
+        ├── mouse01_timeline_1.0min.svg
+        ├── mouse01_transitions_matrix.csv
+        └── mouse01_transitions_heatmap.svg
+```
+
+### Key Output Files:
+
+**Core Files:**
+- `{filename}_behaviors.csv`: Frame-by-frame behavior IDs (frame, behavior_id)
+- `{filename}_time.csv`: Time vector for each frame (frame, time_seconds)
+- `{filename}_summary.csv`: Recording metadata (duration, framerate, keypoints, behavior statistics)
+
+**Master Summary:**
+- `{filename}_ANALYSIS_SUMMARY.csv`: Consolidated summary with:
+  - Bout counts for all behaviors
+  - Time distribution percentages
+  - Bout duration statistics (mean, median)
+  - Top 5 behavior transitions
+
+**Analysis Files:**
+- Files ending in `.csv`: Numerical data (can be opened in Excel, R, Python)
+- Files ending in `.svg`: Vector graphics (publication-ready, scalable)
+- Files ending in `.png`: Raster graphics (for quick viewing)
+
+**Note:** The `_analysis` folder contains all statistical analyses and visualizations. The `_ANALYSIS_SUMMARY.csv` provides a quick overview of all key metrics in one place.
 
 ## Configuration
 
@@ -336,8 +404,10 @@ LUPE_analysis_RASO_version/
 │   │   ├── data_loader.py
 │   │   ├── feature_extraction.py
 │   │   ├── classification.py
-│   │   ├── analysis_*.py   # Standard analysis modules
-│   │   ├── analysis_lupe_amps.py  # LUPE-AMPS analysis
+│   │   ├── dlc_preprocessing.py
+│   │   ├── file_summary.py         # Generate summary CSV files
+│   │   ├── analysis_*.py           # Standard analysis modules
+│   │   ├── analysis_lupe_amps.py   # LUPE-AMPS analysis
 │   │   └── ...
 │   ├── gui/                # GUI components
 │   │   ├── main_window.py         # LUPE classification GUI
@@ -347,7 +417,9 @@ LUPE_analysis_RASO_version/
 │   └── utils/              # Utility modules
 │       ├── config_manager.py
 │       ├── plotting.py
-│       └── lupe_amps_helpers.py   # LUPE-AMPS utilities
+│       ├── amps_summary_reader.py  # Read parameters from summary CSV
+│       ├── master_summary.py       # Generate master analysis summaries
+│       └── model_utils.py
 │
 ├── outputs/                # Analysis outputs
 ├── data/                   # Input data directory
@@ -514,8 +586,10 @@ This version converts the Jupyter notebook-based workflow into a standalone appl
 **Functional Changes:**
 - ❌ Removed: Group and condition comparisons (per project requirements)
 - ❌ Removed: Statistical tests between groups
-- ✅ Added: LUPE-AMPS standalone GUI
+- ✅ Added: LUPE-AMPS standalone GUI with auto-detection
 - ✅ Added: Main launcher for easy access
+- ✅ Added: Automatic summary CSV generation per file
+- ✅ Added: Master analysis summary consolidation
 - ✅ Simplified: Focus on individual file analysis with aggregate statistics
 
 **Organization Changes:**

@@ -16,6 +16,11 @@ Usage:
     plot_behavior_pie(values, labels, output_path='plot.svg')
 """
 
+# Configure matplotlib to use thread-safe backend for Windows compatibility
+# Must be set BEFORE importing pyplot to avoid threading deadlocks
+import matplotlib
+matplotlib.use('Agg')  # Non-GUI backend prevents threading issues in background threads
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
@@ -65,6 +70,9 @@ def save_figure(fig: plt.Figure, output_path: str, dpi: Optional[int] = None):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     fig.savefig(output_path, dpi=dpi, bbox_inches='tight')
+
+    # Close the figure to free memory (critical for multi-file processing)
+    plt.close(fig)
 
 
 def plot_behavior_pie(values: np.ndarray,

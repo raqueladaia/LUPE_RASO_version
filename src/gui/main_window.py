@@ -42,6 +42,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
 from pathlib import Path
+import gc
 
 import numpy as np
 import pandas as pd
@@ -57,39 +58,7 @@ from src.core.analysis_transitions import analyze_transitions
 from src.core.file_summary import generate_dlc_summary
 from src.utils.config_manager import get_config
 from src.utils.master_summary import create_analysis_summary
-
-
-def extract_partial_filename(csv_path: str) -> str:
-    """
-    Extract the partial filename before 'DLC' from a CSV file path.
-
-    This function extracts the portion of the base filename that comes before
-    the 'DLC' marker. This is used to create organized output folders.
-
-    Args:
-        csv_path (str): Full path to the CSV file
-
-    Returns:
-        str: Partial filename before 'DLC' (e.g., 'mouse01' from 'mouse01DLC_tracking.csv')
-
-    Example:
-        >>> extract_partial_filename('/path/to/mouse01DLC_resnet50.csv')
-        'mouse01'
-        >>> extract_partial_filename('/path/to/Subject_123_DLC_analysis.csv')
-        'Subject_123_'
-    """
-    # Get the base filename without extension
-    base_name = Path(csv_path).stem
-
-    # Find 'DLC' in the filename (case-insensitive)
-    dlc_index = base_name.upper().find('DLC')
-
-    if dlc_index != -1:
-        # Return everything before 'DLC'
-        return base_name[:dlc_index]
-    else:
-        # If 'DLC' is not found, return the full base name
-        return base_name
+from src.utils.filename_utils import extract_partial_filename
 
 
 class LupeGUI:
@@ -412,16 +381,28 @@ class LupeGUI:
 
                 # Step 2: Classify behaviors
                 self._log(f"\n[Step 2] Classifying behaviors...")
+                self._log(f"  [DEBUG] Starting feature extraction for {pose_data.shape[0]:,} frames...")
                 try:
                     predictions = classify_behaviors(model, [pose_data])[0]
-                    self._log(f"  [OK] Classified {len(predictions)} frames")
+                    self._log(f"  [DEBUG] Feature extraction and prediction complete")
+                    self._log(f"  [OK] Classified {len(predictions):,} frames")
                     self._log(f"  [OK] Found {len(np.unique(predictions))} unique behaviors")
                     current_step += 1
                     self._update_progress((current_step / total_steps) * 100)
+
+                    # Explicitly free pose_data to release memory (critical for multi-file processing)
+                    del pose_data
+                    gc.collect()
+                    self._log(f"  [DEBUG] Memory released after classification")
+
                 except Exception as e:
                     self._log(f"  [ERROR] Classification error: {str(e)}")
                     self._log(f"  Skipping {csv_file.name}")
                     current_step += (1 + len(selected_analyses))  # Skip remaining steps for this file
+
+                    # Free memory before continuing to next file
+                    del pose_data
+                    gc.collect()
                     continue
 
                 # Step 3: Create output folder structure
@@ -551,6 +532,10 @@ class LupeGUI:
                         self._log(f"  [WARNING] Could not create master summary: {str(e)}")
 
                 self._log(f"[OK] Completed processing: {csv_file.name}")
+
+                # Aggressively free memory after each file completes all processing
+                # This ensures garbage collection happens between files
+                gc.collect()
 
             self._log("\n" + "=" * 60)
             self._log("All analyses completed successfully!")

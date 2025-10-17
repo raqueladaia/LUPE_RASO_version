@@ -28,6 +28,7 @@ from typing import Dict, List, Tuple, Optional
 from glob import glob
 import pickle
 import time
+import gc
 
 from src.core.feature_extraction import filter_pose_noise
 from src.utils.config_manager import get_config
@@ -213,6 +214,11 @@ def preprocess_dlc_csv(csv_path: str,
     # Report quality
     mean_quality = np.mean(quality_metrics) * 100
     print(f"  Quality: {mean_quality:.1f}% of frames needed correction ({filter_time:.2f}s)")
+
+    # Explicitly free memory from DataFrame (critical for multi-file processing)
+    # The filtered_data is now a numpy array, so we can release the large DataFrame
+    del dlc_df
+    gc.collect()
 
     # Save if requested
     if save_output:

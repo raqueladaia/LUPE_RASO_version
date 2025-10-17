@@ -39,6 +39,7 @@ CLAUDE.md  # Internal development instructions, not for public distribution
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb  # Prevent accidental notebook commits (per project rules)
 
 # Output files
 outputs/
@@ -59,6 +60,13 @@ models/*.pkl
 # Test files (per project rules)
 test_*.py
 *_test.py
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Type checking
+.mypy_cache/
 
 # Logs
 *.log
@@ -66,3 +74,11 @@ test_*.py
 # Temporary files
 *.tmp
 *.bak
+
+# Environment variables (may contain sensitive data)
+.env
+.env.*
+
+# Python distribution
+pip-log.txt
+pip-delete-this-directory.txt

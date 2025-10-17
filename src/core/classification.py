@@ -25,6 +25,7 @@ Usage:
 
 import numpy as np
 import pandas as pd
+import gc
 from typing import Any, Dict, List, Optional
 from src.core.feature_extraction import feature_extraction, weighted_smoothing
 from src.utils.config_manager import get_config
@@ -102,20 +103,31 @@ def classify_behaviors(model: Any,
         # Predict on downsampled features (10 Hz)
         predict_downsampled = model.predict(feat)
 
-        # Upsample predictions back to original framerate
+        # Upsample predictions back to original framerate with explicit intermediate cleanup
         # repeat_factor converts from 10 Hz to original fps (e.g., 60 fps)
-        # pad with 'edge' mode to handle boundary, then trim to exact length
-        predictions_upsampled = np.pad(
-            predict_downsampled.repeat(repeat_factor),
-            (repeat_factor, 0),
-            'edge'
-        )[:total_n_frames]
+        # Make intermediates explicit to ensure proper memory cleanup
+        predictions_repeated = predict_downsampled.repeat(repeat_factor)
+        predictions_padded = np.pad(predictions_repeated, (repeat_factor, 0), 'edge')
+        predictions_upsampled = predictions_padded[:total_n_frames]
+
+        # Free intermediate upsampling arrays
+        del predictions_repeated, predictions_padded
 
         # Step 3: Smooth predictions to remove jitter
         # This removes short behavior bouts that are likely classification errors
         predictions_smooth = weighted_smoothing(predictions_upsampled, size=smoothing_window)
 
         predictions.append(predictions_smooth)
+
+        # Free this file's features and intermediate arrays immediately after use
+        # This prevents accumulation when processing multiple files
+        del feat, predict_downsampled, predictions_upsampled
+        # NOTE: gc.collect() removed from loop - was causing slowdown on Windows
+        # Will run once after all predictions complete
+
+    # Free entire features list after all predictions are made
+    del features
+    gc.collect()  # Single GC after all files processed
 
     return predictions
 
