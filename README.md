@@ -194,7 +194,26 @@ This project requires specific Python and library versions due to a dependency c
 
 6. **Download the LUPE A-SOiD model**
    - Download from: [LUPE Model Link](https://upenn.box.com/s/9rfslrvcc7m6fji8bmgktnegghyu88b0)
-   - Place the model file in a `models/` directory
+   - **CRITICAL: After downloading, you MUST rename the file to `model_LUPE.pkl`**
+   - Place the renamed file in the `models/` directory
+   - Example: If you downloaded `LUPE_model_v2.pkl`, rename it to `model_LUPE.pkl`
+   - This exact filename is required by the analysis code
+
+### CRITICAL: Model File Naming Requirements
+
+**The analysis code requires exact model filenames. You MUST use these names:**
+
+- **`model_LUPE.pkl`** - LUPE classification model (you must download and rename this)
+  - Download from the link above
+  - Rename to exactly `model_LUPE.pkl`
+  - Place in `models/` directory
+
+- **`model_AMPS.pkl`** - LUPE-AMPS pain scale model (already included in repository)
+  - This file is already included with the correct name
+  - Located in `models/` directory
+  - No action needed
+
+**Why these exact names?** The code references these specific filenames. Using different names will cause "FileNotFoundError" when running analyses.
 
 ## Quick Start
 
@@ -258,7 +277,7 @@ python main_cli.py --help
 
 # Option 1: Complete workflow from DLC CSV
 python main_cli.py preprocess --input dlc_data/*.csv --output pose_data.pkl
-python main_cli.py classify --model model.pkl --input pose_data.pkl --output behaviors.pkl
+python main_cli.py classify --model models/model_LUPE.pkl --input pose_data.pkl --output behaviors.pkl
 python main_cli.py analyze --behaviors behaviors.pkl --output results/ --all
 
 # Option 2: Analyze pre-classified behaviors
@@ -296,7 +315,7 @@ The CLI provides command-line access for automation and scripting.
 ```bash
 # Classify behaviors from pose data
 python main_cli.py classify \
-  --model models/model_LUPE-AMPS.pkl \
+  --model models/model_LUPE.pkl \
   --input data/pose_file.npy \
   --output behaviors.pkl
 
@@ -616,6 +635,43 @@ python -c "import sklearn, numpy; print(f'scikit-learn: {sklearn.__version__}');
 **After fixing versions:**
 - The model should load without errors
 - Do NOT upgrade sklearn to 1.3.x or the error will return
+
+### Model File Not Found Errors
+
+**Problem:** You see an error like:
+- "FileNotFoundError: [Errno 2] No such file or directory: 'models/model_LUPE.pkl'"
+- "FileNotFoundError: [Errno 2] No such file or directory: 'models/model_AMPS.pkl'"
+- "Unable to load model file"
+
+**Root Cause:** The model files are either missing or incorrectly named.
+
+**SOLUTION:**
+
+1. **For LUPE classification model (model_LUPE.pkl):**
+   - Verify you downloaded the model from: https://upenn.box.com/s/9rfslrvcc7m6fji8bmgktnegghyu88b0
+   - Check the file is renamed to exactly `model_LUPE.pkl` (NOT `LUPE_model.pkl`, `model.pkl`, or any other name)
+   - Verify the file is in the `models/` directory in your project root
+   - Check the file has a `.pkl` extension
+
+2. **For AMPS pain scale model (model_AMPS.pkl):**
+   - This file should already be included in the repository
+   - Verify the file exists at `models/model_AMPS.pkl`
+   - If missing, re-clone the repository or download it separately
+
+3. **Verify model files are in the correct location:**
+   ```bash
+   # Windows:
+   dir models
+
+   # macOS/Linux:
+   ls -la models/
+   ```
+
+   **Expected output should show:**
+   - `model_LUPE.pkl` (you must download and rename this)
+   - `model_AMPS.pkl` (included in repository)
+
+**Important:** The code expects these EXACT filenames. Using different names will cause FileNotFoundError. See the [Model File Naming Requirements](#critical-model-file-naming-requirements) section in Installation for more details.
 
 ### GUI doesn't start
 - Check that all dependencies are installed: `pip install -r requirements.txt`
