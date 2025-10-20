@@ -275,14 +275,19 @@ See `docs/LUPE_AMPS_GUIDE.md` for detailed instructions.
 # View available commands
 python main_cli.py --help
 
-# Option 1: Complete workflow from DLC CSV
+# RECOMMENDED: Complete workflow in one command (like GUI)
+python main_cli.py run --dlc-csv data/*.csv --model models/model_LUPE.pkl --output outputs/
+
+# Option 1: Step-by-step workflow
 python main_cli.py preprocess --input dlc_data/*.csv --output pose_data.pkl
 python main_cli.py classify --model models/model_LUPE.pkl --input pose_data.pkl --output behaviors.pkl
-python main_cli.py analyze --behaviors behaviors.pkl --output results/ --all
+python main_cli.py analyze --behaviors behaviors.pkl --output outputs/ --all
 
 # Option 2: Analyze pre-classified behaviors
-python main_cli.py export --behaviors behaviors.pkl --output csv/
-python main_cli.py analyze --behaviors behaviors.pkl --output results/ --all
+python main_cli.py analyze --behaviors behaviors.pkl --output outputs/ --all
+
+# Option 3: Run LUPE-AMPS pain scale analysis
+python main_cli.py amps --csv-files outputs/*/\*_behaviors.csv --output outputs/
 ```
 
 ## Usage
@@ -313,28 +318,60 @@ The CLI provides command-line access for automation and scripting.
 **Available Commands:**
 
 ```bash
-# Classify behaviors from pose data
+# 1. RUN - Complete workflow (RECOMMENDED - matches GUI functionality)
+python main_cli.py run \
+  --dlc-csv data/mouse01.csv data/mouse02.csv \
+  --model models/model_LUPE.pkl \
+  --output outputs/ \
+  --likelihood-threshold 0.1
+
+# 2. AMPS - Run LUPE-AMPS pain scale analysis
+python main_cli.py amps \
+  --csv-files outputs/mouse01/mouse01_behaviors.csv outputs/mouse02/mouse02_behaviors.csv \
+  --model models/model_AMPS.pkl \
+  --output outputs/ \
+  --project-name MyProject \
+  --sections 1 2 3 4
+
+# 3. CLASSIFY - Classify behaviors from pose data
 python main_cli.py classify \
   --model models/model_LUPE.pkl \
   --input data/pose_file.npy \
   --output behaviors.pkl
 
-# Run specific analysis
+# 4. ANALYZE - Run analyses on classified behaviors
 python main_cli.py analyze \
   --behaviors behaviors.pkl \
-  --output results/ \
-  --instance-counts \
-  --total-frames
+  --output outputs/ \
+  --all
 
-# Export to CSV
+# Or run specific analyses
+python main_cli.py analyze \
+  --behaviors behaviors.pkl \
+  --output outputs/ \
+  --instance-counts \
+  --total-frames \
+  --durations
+
+# 5. EXPORT - Export to CSV
 python main_cli.py export \
   --behaviors behaviors.pkl \
   --output csv/ \
   --summary
 
-# View configuration
+# 6. CONFIG - View configuration
 python main_cli.py config --show
 ```
+
+**Command Details:**
+
+- **run**: Complete workflow (preprocess → classify → analyze) - Mimics GUI behavior
+- **amps**: LUPE-AMPS pain scale analysis with 4 sections
+- **classify**: Classify behaviors using LUPE model
+- **preprocess**: Preprocess DeepLabCut CSV files
+- **analyze**: Run standard behavior analyses (creates structured output like GUI)
+- **export**: Export behaviors to CSV format
+- **config**: View or modify configuration settings
 
 See `docs/CLI_GUIDE.md` for detailed command reference.
 
