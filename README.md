@@ -38,6 +38,7 @@ A comprehensive, user-friendly analysis tool for LUPE (Light aUtomated Pain Eval
 - [Project Structure](#project-structure)
 - [Troubleshooting](#troubleshooting)
 - [Reference Repository & Attribution](#reference-repository--attribution)
+  - [Publication](#publication)
 - [Citation](#citation)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
@@ -821,58 +822,104 @@ If you encounter issues not covered here:
 
 ## Reference Repository & Attribution
 
-This tool is a **complete rewrite** of the original LUPE 2.0 Notebook Analysis Package.
+This tool is an alternative implementation of the LUPE 2.0 analysis framework, complementing the existing official versions.
 
 **Original Project:** LUPE 2.0 - Light Automated Pain Evaluator
 **Original Authors:** Corder Lab (University of Pennsylvania) & Yttri Lab (Carnegie Mellon University)
-**Original Repository:** https://github.com/justin05423/LUPE-2.0-NotebookAnalysisPackage
 
-### What Was Changed
+**Official LUPE 2.0 Repositories:**
 
-This version converts the Jupyter notebook-based workflow into a standalone application while preserving all analytical capabilities:
+There are two official implementations, each serving different use cases:
 
-**Architecture Changes:**
-- ❌ Removed: Jupyter notebooks (.ipynb files)
-- ✅ Added: GUI application with tkinter
-- ✅ Added: CLI for command-line automation
-- ✅ Added: Modular Python package structure
+1. **[LUPE-2.0-App](https://github.com/justin05423/LUPE-2.0-App)** - Streamlit Web Application
+   - Web-based interface accessible through browser
+   - No local installation required
+   - File size upload constraints (Streamlit limitation)
+   - Best for: Quick analyses, users without programming experience
 
-**Functional Changes:**
-- ❌ Removed: Group and condition comparisons (per project requirements)
+2. **[LUPE-2.0-NotebookAnalysisPackage](https://github.com/justin05423/LUPE-2.0-NotebookAnalysisPackage)** - Jupyter Notebooks
+   - Interactive notebook environment
+   - Educational - shows analysis implementation details
+   - Requires Jupyter setup
+   - Best for: Learning how LUPE works, customizing analyses
+
+### This Version - GUI/CLI Standalone Application
+
+**Why This Version Exists:**
+
+This repository provides a third approach that combines the best aspects of both official versions while addressing their limitations:
+
+**Comparison with Official Versions:**
+
+| Feature | Streamlit App | Jupyter Notebooks | This Version (GUI/CLI) |
+|---------|---------------|-------------------|------------------------|
+| **Interface** | Web browser | Jupyter environment | Desktop GUI + CLI |
+| **Installation** | Not required | Jupyter required | Local Python install |
+| **File Size Limits** | Yes (Streamlit) | No | No |
+| **Coding Required** | No | Optional | Optional (GUI or CLI) |
+| **Automation** | Limited | Manual | Full CLI support |
+| **Offline Use** | No | Yes | Yes |
+| **Best For** | Quick online analysis | Learning internals | Production workflows |
+
+**Key Differences in This Version:**
+
+**Architecture:**
+- ✅ Desktop GUI (tkinter) - no web server needed, no file size limits
+- ✅ Full-featured CLI - for automation, scripting, and batch processing
+- ✅ Modular Python package structure - easy to maintain and extend
+- ❌ No Jupyter notebooks - simpler for end-users who just want results
+- ❌ No Streamlit - runs entirely offline with no upload constraints
+
+**Workflow Philosophy:**
+- ❌ Removed: Group and condition comparisons
 - ❌ Removed: Statistical tests between groups
-- ✅ Added: LUPE-AMPS standalone GUI with auto-detection
-- ✅ Added: Main launcher for easy access
+- ✅ **Simplified**: Focus on individual file analysis - user performs their own comparisons
 - ✅ Added: Automatic summary CSV generation per file
 - ✅ Added: Master analysis summary consolidation
-- ✅ Simplified: Focus on individual file analysis with aggregate statistics
+- ✅ Added: LUPE-AMPS standalone GUI with auto-detection
 
-**Organization Changes:**
-- ✅ Added: Comprehensive documentation (README, guides, tutorials)
-- ✅ Added: JSON-based configuration (no hardcoded values)
-- ✅ Added: Per-file output directories
-- ✅ Added: Dependency management with exact versions
+**Technical Improvements:**
+- ✅ Comprehensive documentation (README, guides, tutorials)
+- ✅ JSON-based configuration (no hardcoded values)
+- ✅ Per-file output directories for organized results
+- ✅ Exact dependency management with frozen versions
 
-### Why This Rewrite?
+**Who Should Use This Version:**
 
-The original LUPE 2.0 used Jupyter notebooks, which are excellent for interactive exploration but have limitations:
-- Difficult to version control (JSON format)
-- Hard to automate and integrate into pipelines
-- Requires Jupyter environment setup
-- Not suitable for end-user distribution
+- Researchers who need to process large files (>200MB) that exceed Streamlit limits
+- Users who want both GUI convenience AND CLI automation capabilities
+- Labs processing many files in batch workflows
+- Users who prefer local, offline analysis tools
+- Researchers who want to handle their own statistical comparisons between groups
 
-This rewrite addresses these limitations while preserving all analytical capabilities and properly attributing the original work.
+For more details on the relationship to the reference repositories, see `reference_repo/README.md`.
 
-For more details on the relationship to the reference repository, see `reference_repo/README.md`.
+### Publication
+
+The LUPE 2.0 methodology and framework are described in the following publication:
+
+**Manuscript (bioRxiv preprint):**
+- https://www.biorxiv.org/content/10.1101/2024.04.26.591113v2
+
+**Exciting News!** We are thrilled to announce that this work has been accepted for publication in **Nature** and will be published soon! This represents a significant milestone in automated pain assessment research.
 
 ## Citation
 
-**If you use this tool in your research, please cite the original LUPE 2.0 project:**
+**If you use this tool or any LUPE 2.0 implementation in your research, please cite:**
 
+**Preprint Citation:**
 ```
 LUPE 2.0: Light Automated Pain Evaluator
+bioRxiv preprint: https://doi.org/10.1101/2024.04.26.591113
 Corder Lab (University of Pennsylvania) & Yttri Lab (Carnegie Mellon University)
-GitHub: https://github.com/justin05423/LUPE-2.0-NotebookAnalysisPackage
 ```
+
+**GitHub Repositories:**
+- Streamlit App: https://github.com/justin05423/LUPE-2.0-App
+- Jupyter Notebooks: https://github.com/justin05423/LUPE-2.0-NotebookAnalysisPackage
+- This Version (GUI/CLI): https://github.com/raqueladaia/LUPE_RASO_version
+
+**Note:** Once the Nature publication is available, please use the official Nature citation for academic work.
 
 ## License
 
