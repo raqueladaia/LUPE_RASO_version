@@ -7,7 +7,7 @@ A comprehensive, user-friendly analysis tool for LUPE (Light aUtomated Pain Eval
 ## Features
 
 - **No Jupyter Notebooks Required**: Runs entirely in VS Code, Cursor, or command line
-- **DeepLabCut Integration**: Direct support for raw DLC CSV files
+- **DeepLabCut Integration**: Direct support for raw DLC files
 - **Dual Interface**: Choose between GUI for ease-of-use or CLI for automation
 - **Two Analysis Modes**:
   - **LUPE Classification**: Behavior classification and standard metrics
@@ -795,13 +795,13 @@ python -c "import sklearn, numpy; print(f'scikit-learn: {sklearn.__version__}');
 - Consider using a machine with more RAM for very large datasets
 
 ### Feature extraction errors
-- Ensure your DLC CSV files have the correct format (multi-level headers)
+- Ensure your DLC files have the correct format (multi-level headers)
 - Check that likelihood threshold is appropriate (default: 0.1)
 - Verify the CSV files contain data for all expected keypoints
 
 ### Classification produces unexpected results
 - Check that you're using the correct A-SOiD model for your data
-- Verify your DLC CSV files are from the same camera setup as the training data
+- Verify your DLC files are from the same camera setup as the training data
 - Ensure the framerate setting matches your video framerate (default: 60 fps)
 
 ### Memory errors

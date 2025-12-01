@@ -37,7 +37,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Preprocess DLC CSV files
+  # Preprocess DLC files
   lupe-cli preprocess --input dlc_data/*.csv --output pose_data.pkl
 
   # Classify behaviors from pose data
@@ -88,13 +88,13 @@ For more information, visit: https://github.com/your-repo/LUPE-analysis
     # ============ PREPROCESS Command ============
     preprocess_parser = subparsers.add_parser(
         'preprocess',
-        help='Preprocess raw DeepLabCut CSV files'
+        help='Preprocess raw DeepLabCut files'
     )
     preprocess_parser.add_argument(
         '--input', '-i',
         required=True,
         nargs='+',
-        help='Input DLC CSV files (one or more)'
+        help='Input DLC files (one or more)'
     )
     preprocess_parser.add_argument(
         '--output', '-o',
@@ -715,7 +715,7 @@ def cmd_run(args):
     print("LUPE Complete Workflow")
     print("=" * 60)
     print("\nThis command runs the full pipeline:")
-    print("  1. Preprocess DLC CSV files")
+    print("  1. Preprocess DLC files")
     print("  2. Classify behaviors with LUPE model")
     print("  3. Run all analyses and generate summaries")
 

@@ -38,8 +38,8 @@ Depending on your input type selection:
 - **Behaviors File**: Select your behavior data (.pkl file)
 - **Output Directory**: Choose where results will be saved
 
-**For Raw DeepLabCut CSV:**
-- **DLC CSV Files**: Select one or more DLC output CSV files
+**For Raw DeepLabCut:**
+- **DLC Files**: Select one or more DLC output files
 - **Model File**: Select the LUPE A-SOiD model (.pkl file)
 - **Likelihood Threshold**: Minimum confidence for pose filtering (0.0-1.0, default: 0.1)
 - **Output Directory**: Choose where results will be saved
@@ -81,8 +81,8 @@ There are two workflows depending on your data type:
 1. Select the **"Raw DeepLabCut CSV Files"** radio button
 
 #### Step 2: Load Your Data
-1. Click **Browse** next to "DLC CSV Files"
-2. Select one or more DLC CSV files (hold Ctrl/Cmd to select multiple)
+1. Click **Browse** next to "DLC Files"
+2. Select one or more DLC files (hold Ctrl/Cmd to select multiple)
 3. The number of selected files will be displayed
 4. Click **Browse** next to "Model File"
 5. Select your LUPE A-SOiD model file (.pkl)

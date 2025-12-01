@@ -3,14 +3,14 @@ Main GUI Window for LUPE Analysis Tool
 
 This module provides a graphical user interface for LUPE analysis using tkinter.
 The GUI allows users to:
-- Load DeepLabCut CSV files
+- Load DeepLabCut files (CSV or H5 format)
 - Classify behaviors using a pre-trained A-SOiD model
 - Select which analyses to run
 - Configure output settings
 - Run the complete analysis pipeline with a single click
 
 Output Structure:
-    For each input CSV file (e.g., "mouse01DLC_resnet50.csv"), the GUI creates:
+    For each input file (e.g., "mouse01DLC_resnet50.csv" or "mouse01DLC_resnet50.h5"), the GUI creates:
 
     outputs/
     └── mouse01/                          # Partial name extracted before "DLC"
@@ -43,6 +43,9 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 import threading
 from pathlib import Path
 import gc
+import time
+import psutil
+import matplotlib.pyplot as plt
 
 import numpy as np
 import pandas as pd
@@ -59,6 +62,7 @@ from src.core.file_summary import generate_dlc_summary
 from src.utils.config_manager import get_config
 from src.utils.master_summary import create_analysis_summary
 from src.utils.filename_utils import extract_partial_filename
+from src.utils.plotting import close_all_plots
 
 
 class LupeGUI:
@@ -82,6 +86,11 @@ class LupeGUI:
         self.behaviors_data = None
         self.output_dir = None
 
+        # Framerate configuration state
+        self.detected_frames = 0
+        self.calculated_framerate = 60.0  # Default fallback
+        self.framerate_user_modified = False
+
         # Create GUI components
         self._create_widgets()
 
@@ -90,6 +99,53 @@ class LupeGUI:
 
         # Load configuration
         self.config = get_config()
+
+    def _log_memory_status(self, label: str = ""):
+        """
+        Log current memory usage and matplotlib figure count for diagnostics.
+
+        Args:
+            label (str): Optional label to identify when this measurement was taken
+        """
+        try:
+            process = psutil.Process()
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            fig_count = len(plt.get_fignums())
+
+            msg = f"[MEMORY] {label}: {memory_mb:.1f} MB used, {fig_count} figures open"
+            self._log(msg)
+        except Exception as e:
+            self._log(f"[MEMORY] Could not get memory info: {str(e)}")
+
+    def _format_elapsed_time(self, seconds: float) -> str:
+        """
+        Format elapsed time in seconds to human-readable string.
+
+        Args:
+            seconds (float): Elapsed time in seconds
+
+        Returns:
+            str: Formatted time string (e.g., "45.2s", "2m 34s", "1h 5m 23s")
+
+        Examples:
+            >>> _format_elapsed_time(45.234)
+            "45.2s"
+            >>> _format_elapsed_time(154.7)
+            "2m 35s"
+            >>> _format_elapsed_time(3923.5)
+            "1h 5m 24s"
+        """
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+        elif seconds < 3600:
+            minutes = int(seconds // 60)
+            secs = int(seconds % 60)
+            return f"{minutes}m {secs}s"
+        else:
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = int(seconds % 60)
+            return f"{hours}h {minutes}m {secs}s"
 
     def _create_widgets(self):
         """Create all GUI widgets."""
@@ -106,7 +162,7 @@ class LupeGUI:
         # ========== Title ==========
         title_label = ttk.Label(
             main_frame,
-            text="Process DLC (.csv) files through LUPE A-SOiD model",
+            text="Process DLC files (.csv or .h5) through LUPE A-SOiD model",
             font=('Arial', 16, 'bold')
         )
         title_label.grid(row=0, column=0, columnspan=2, pady=10)
@@ -118,8 +174,8 @@ class LupeGUI:
         # Configure column weights to prevent button cutoff
         file_frame.columnconfigure(1, weight=1)
 
-        # DLC CSV files
-        ttk.Label(file_frame, text="DLC CSV Files:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        # DLC Files (CSV or H5)
+        ttk.Label(file_frame, text="DLC Files:").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.dlc_path_var = tk.StringVar(master=self.root, value="No files selected")
         ttk.Entry(file_frame, textvariable=self.dlc_path_var, width=30).grid(row=0, column=1, sticky=(tk.W, tk.E), padx=5)
         ttk.Button(file_frame, text="Browse...", command=self._select_dlc_files).grid(row=0, column=2, sticky=tk.W, padx=(5, 0))
@@ -179,6 +235,47 @@ class LupeGUI:
         ttk.Spinbox(options_frame, from_=0.5, to=10.0, increment=0.5,
                    textvariable=self.bin_minutes_var, width=10).grid(row=0, column=1, sticky=tk.W, padx=5)
 
+        # Framerate Configuration
+        ttk.Separator(options_frame, orient='horizontal').grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+
+        ttk.Label(options_frame, text="Framerate Configuration:", font=('TkDefaultFont', 9, 'bold')).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(5,2))
+
+        # Radio buttons for mode selection
+        self.framerate_mode_var = tk.StringVar(master=self.root, value="fps")
+
+        fps_radio = ttk.Radiobutton(options_frame, text="Specify FPS:",
+                                     variable=self.framerate_mode_var, value="fps",
+                                     command=self._on_framerate_mode_changed)
+        fps_radio.grid(row=3, column=0, sticky=tk.W, pady=2)
+
+        self.fps_var = tk.DoubleVar(master=self.root, value=60.0)
+        self.fps_entry = ttk.Spinbox(options_frame, from_=10.0, to=300.0, increment=1.0,
+                                     textvariable=self.fps_var, width=10,
+                                     command=self._on_fps_changed)
+        self.fps_entry.grid(row=3, column=1, sticky=tk.W, padx=5)
+        self.fps_entry.bind('<KeyRelease>', lambda e: self._on_fps_changed())
+
+        duration_radio = ttk.Radiobutton(options_frame, text="Specify Duration (min):",
+                                          variable=self.framerate_mode_var, value="duration",
+                                          command=self._on_framerate_mode_changed)
+        duration_radio.grid(row=4, column=0, sticky=tk.W, pady=2)
+
+        self.duration_var = tk.DoubleVar(master=self.root, value=0.0)
+        self.duration_entry = ttk.Spinbox(options_frame, from_=0.1, to=1000.0, increment=1.0,
+                                          textvariable=self.duration_var, width=10,
+                                          command=self._on_duration_changed, state='disabled')
+        self.duration_entry.grid(row=4, column=1, sticky=tk.W, padx=5)
+        self.duration_entry.bind('<KeyRelease>', lambda e: self._on_duration_changed())
+
+        # Display detected and calculated values
+        self.frames_label = ttk.Label(options_frame, text="Detected: Select files to detect frames",
+                                      foreground='gray')
+        self.frames_label.grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=(5,2))
+
+        self.calculated_label = ttk.Label(options_frame, text="Calculated: --",
+                                          foreground='blue')
+        self.calculated_label.grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(0,5))
+
         # ========== Action Buttons (Left Column) ==========
         action_frame = ttk.Frame(main_frame)
         action_frame.grid(row=4, column=0, pady=15, padx=(0, 5))
@@ -236,16 +333,24 @@ class LupeGUI:
             self.model_path = None
 
     def _select_dlc_files(self):
-        """Open file dialog to select DLC CSV files."""
+        """Open file dialog to select DLC files (CSV or H5 format)."""
         filenames = filedialog.askopenfilenames(
-            title="Select DLC CSV Files",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+            title="Select DLC Files (CSV or H5)",
+            filetypes=[
+                ("DLC files", "*.csv *.h5"),
+                ("CSV files", "*.csv"),
+                ("H5 files", "*.h5"),
+                ("All files", "*.*")
+            ]
         )
         if filenames:
             self.dlc_csv_paths = list(filenames)
             count = len(filenames)
             self.dlc_path_var.set(f"{count} file(s) selected")
-            self._log(f"Selected {count} DLC CSV file(s)")
+            self._log(f"Selected {count} DLC file(s)")
+
+            # Detect frame count from first file for framerate calculation
+            self._detect_frame_count()
 
     def _select_model_file(self):
         """Open file dialog to select model file."""
@@ -278,9 +383,145 @@ class LupeGUI:
         for var in self.analyses.values():
             var.set(False)
 
+    def _on_framerate_mode_changed(self):
+        """Handle framerate mode radio button change (FPS vs Duration)."""
+        mode = self.framerate_mode_var.get()
+        if mode == "fps":
+            self.fps_entry.config(state='normal')
+            self.duration_entry.config(state='disabled')
+        else:  # mode == "duration"
+            self.fps_entry.config(state='disabled')
+            self.duration_entry.config(state='normal')
+
+        # Mark as user-modified
+        self.framerate_user_modified = True
+        # Recalculate
+        self._calculate_framerate_values()
+
+    def _on_fps_changed(self):
+        """Handle FPS value change."""
+        self.framerate_user_modified = True
+        self._calculate_framerate_values()
+
+    def _on_duration_changed(self):
+        """Handle duration value change."""
+        self.framerate_user_modified = True
+        self._calculate_framerate_values()
+
+    def _calculate_framerate_values(self):
+        """Calculate framerate or duration based on user input and detected frames."""
+        if self.detected_frames == 0:
+            # No files loaded yet
+            self.calculated_label.config(text="Calculated: Select files first", foreground='gray')
+            return
+
+        mode = self.framerate_mode_var.get()
+
+        try:
+            if mode == "fps":
+                # User specified FPS, calculate duration
+                fps = self.fps_var.get()
+                if fps <= 0:
+                    self.calculated_label.config(text="Calculated: Invalid FPS (must be > 0)", foreground='red')
+                    return
+
+                duration_minutes = self.detected_frames / (fps * 60)
+                self.calculated_framerate = fps
+                self.calculated_label.config(
+                    text=f"Calculated Duration: {duration_minutes:.2f} minutes",
+                    foreground='blue'
+                )
+
+                # Warn if fps is unusual
+                if fps < 20 or fps > 120:
+                    self.calculated_label.config(
+                        text=f"Calculated Duration: {duration_minutes:.2f} min (⚠️ Unusual FPS)",
+                        foreground='orange'
+                    )
+
+            else:  # mode == "duration"
+                # User specified duration, calculate FPS
+                duration_minutes = self.duration_var.get()
+                if duration_minutes <= 0:
+                    self.calculated_label.config(text="Calculated: Invalid duration (must be > 0)", foreground='red')
+                    return
+
+                fps = self.detected_frames / (duration_minutes * 60)
+                self.calculated_framerate = fps
+                self.calculated_label.config(
+                    text=f"Calculated FPS: {fps:.2f} fps",
+                    foreground='blue'
+                )
+
+                # Warn if calculated fps is unusual
+                if fps < 20 or fps > 120:
+                    self.calculated_label.config(
+                        text=f"Calculated FPS: {fps:.2f} fps (⚠️ Unusual value)",
+                        foreground='orange'
+                    )
+
+        except tk.TclError:
+            # Handle case where spinbox value is being edited
+            self.calculated_label.config(text="Calculated: Enter valid number", foreground='gray')
+
+    def _detect_frame_count(self):
+        """Detect frame count from the first selected file."""
+        if not self.dlc_csv_paths:
+            return
+
+        try:
+            first_file = Path(self.dlc_csv_paths[0])
+            file_ext = first_file.suffix.lower()
+
+            if file_ext == '.h5':
+                # Read H5 file to get frame count
+                import pandas as pd
+                df = pd.read_hdf(str(first_file))
+                self.detected_frames = len(df)
+            elif file_ext == '.csv':
+                # Read CSV file to get frame count
+                import pandas as pd
+                # Read just to count rows (efficient)
+                df = pd.read_csv(str(first_file), header=[0, 1, 2], usecols=[0])
+                self.detected_frames = len(df)
+            else:
+                self._log(f"[WARNING] Unknown file format: {file_ext}")
+                return
+
+            # Update display
+            self.frames_label.config(
+                text=f"Detected: {self.detected_frames:,} frames in first file",
+                foreground='black'
+            )
+
+            # Calculate values
+            self._calculate_framerate_values()
+
+            self._log(f"Detected {self.detected_frames:,} frames from {first_file.name}")
+
+        except Exception as e:
+            self._log(f"[WARNING] Could not detect frame count: {str(e)}")
+            self.frames_label.config(
+                text=f"Detected: Error reading file",
+                foreground='red'
+            )
+
     def _log(self, message):
         """
-        Add a message to the log text area.
+        Add a message to the log text area (thread-safe).
+
+        This method can be called from any thread. It schedules the actual
+        GUI update to run on the main thread using root.after().
+
+        Args:
+            message (str): Message to log
+        """
+        # Schedule GUI update on main thread (thread-safe)
+        self.root.after(0, self._log_safe, message)
+
+    def _log_safe(self, message):
+        """
+        Internal method to update log text (runs on main thread only).
 
         Args:
             message (str): Message to log
@@ -289,7 +530,6 @@ class LupeGUI:
         self.log_text.insert(tk.END, message + '\n')
         self.log_text.see(tk.END)
         self.log_text.configure(state='disabled')
-        self.root.update_idletasks()
 
     def _clear_log(self):
         """Clear the log text area."""
@@ -299,13 +539,25 @@ class LupeGUI:
 
     def _update_progress(self, value):
         """
-        Update the progress bar.
+        Update the progress bar (thread-safe).
+
+        This method can be called from any thread. It schedules the actual
+        GUI update to run on the main thread using root.after().
+
+        Args:
+            value (float): Progress value (0-100)
+        """
+        # Schedule GUI update on main thread (thread-safe)
+        self.root.after(0, self._update_progress_safe, value)
+
+    def _update_progress_safe(self, value):
+        """
+        Internal method to update progress bar (runs on main thread only).
 
         Args:
             value (float): Progress value (0-100)
         """
         self.progress_var.set(value)
-        self.root.update_idletasks()
 
     def _run_analysis(self):
         """Run the selected analyses in a background thread."""
@@ -322,6 +574,24 @@ class LupeGUI:
             messagebox.showwarning("Warning", "Please select at least one analysis.")
             return
 
+        # Check if user has specified framerate (warn if using default)
+        if not self.framerate_user_modified:
+            response = messagebox.askquestion(
+                "Framerate Not Specified",
+                "You have not specified the video framerate or duration.\n\n"
+                "LUPE will assume 60 fps, but if your videos are recorded\n"
+                "at a different framerate, all time-based measurements\n"
+                "will be INCORRECT:\n\n"
+                "  • Behavior durations\n"
+                "  • Timeline binning\n"
+                "  • All timestamps in outputs\n\n"
+                "Please verify your video framerate before continuing.\n\n"
+                "Continue with 60 fps anyway?",
+                icon='warning'
+            )
+            if response == 'no':
+                return  # User cancelled
+
         # Disable run button during analysis
         self.run_button.configure(state='disabled')
 
@@ -336,10 +606,17 @@ class LupeGUI:
             self._log("Starting LUPE Analysis")
             self._log("=" * 60)
 
+            # Record start time for total analysis duration
+            analysis_start_time = time.time()
+
+            # Log initial memory state
+            self._log_memory_status("Analysis start")
+
             # Load model once for all files
             self._log(f"\nLoading model from: {self.model_path}")
             model = load_model(self.model_path)
             self._log("[OK] Model loaded")
+            self._log_memory_status("After model load")
 
             # Get base output directory
             base_output_dir = Path(self.output_dir_var.get())
@@ -347,7 +624,13 @@ class LupeGUI:
 
             # Get configuration
             config = get_config()
-            framerate = config.get_framerate()
+
+            # Use user-specified framerate (or default if not modified)
+            framerate = self.calculated_framerate
+            if not self.framerate_user_modified:
+                self._log("[WARNING] Using default 60 fps - verify this matches your video framerate")
+            else:
+                self._log(f"[INFO] Using framerate: {framerate:.2f} fps")
 
             # Count selected analyses for progress tracking
             selected_analyses = [key for key, var in self.analyses.items() if var.get()]
@@ -360,6 +643,12 @@ class LupeGUI:
                 self._log(f"\n{'='*60}")
                 self._log(f"Processing file {file_idx}/{len(self.dlc_csv_paths)}: {csv_file.name}")
                 self._log(f"{'='*60}")
+
+                # Log memory before processing this file
+                self._log_memory_status(f"Before file {file_idx}")
+
+                # Record start time for this file
+                file_start_time = time.time()
 
                 # Step 1: Preprocess DLC CSV
                 self._log(f"\n[Step 1] Preprocessing...")
@@ -382,7 +671,7 @@ class LupeGUI:
                 # Step 2: Classify behaviors
                 self._log(f"\n[Step 2] Classifying behaviors...")
                 try:
-                    predictions = classify_behaviors(model, [pose_data])[0]
+                    predictions = classify_behaviors(model, [pose_data], framerate=framerate)[0]
                     self._log(f"  [OK] Classified {len(predictions):,} frames")
                     self._log(f"  [OK] Found {len(np.unique(predictions))} unique behaviors")
                     current_step += 1
@@ -420,6 +709,9 @@ class LupeGUI:
                 df_behaviors.to_csv(behaviors_csv_path, index=False)
                 self._log(f"  [OK] Saved: {behaviors_csv_path.name}")
 
+                # Explicitly delete DataFrame to free memory (Phase 1 Fix 1B)
+                del df_behaviors
+
                 # Save time vector CSV (frame, time_seconds)
                 time_csv_path = file_output_dir / f"{partial_name}_time.csv"
                 time_seconds = np.array([i / framerate for i in range(len(predictions))])
@@ -430,11 +722,25 @@ class LupeGUI:
                 df_time.to_csv(time_csv_path, index=False)
                 self._log(f"  [OK] Saved: {time_csv_path.name}")
 
+                # Explicitly delete DataFrame and array to free memory (Phase 1 Fix 1B)
+                del df_time, time_seconds
+
                 # Generate file summary with metadata and behavior statistics
                 try:
-                    # Load DLC CSV headers to extract keypoint information
-                    # We only need to read the header rows (first 4 rows) for efficiency
-                    dlc_df_headers = pd.read_csv(str(csv_path), header=[0, 1, 2], nrows=0)
+                    # Load DLC file headers to extract keypoint information
+                    # Support both CSV and H5 formats
+                    file_ext = csv_file.suffix.lower()
+
+                    if file_ext == '.h5':
+                        # For H5 files, read only first few rows for efficiency
+                        dlc_df_headers = pd.read_hdf(str(csv_path))
+                        # Keep only first row to get column structure (headers)
+                        dlc_df_headers = dlc_df_headers.iloc[:0]
+                    elif file_ext == '.csv':
+                        # For CSV files, read only header rows (first 4 rows)
+                        dlc_df_headers = pd.read_csv(str(csv_path), header=[0, 1, 2], nrows=0)
+                    else:
+                        raise ValueError(f"Unsupported file format: {file_ext}")
 
                     # Get behavior names from config
                     behavior_names = config.get_behavior_names()
@@ -449,6 +755,10 @@ class LupeGUI:
                         behavior_names=behavior_names
                     )
                     self._log(f"  [OK] Saved: {Path(summary_path).name}")
+
+                    # Explicitly delete DataFrame to free memory (Phase 1 Fix 1B)
+                    del dlc_df_headers
+
                 except Exception as e:
                     self._log(f"  [WARNING] Could not generate summary: {str(e)}")
 
@@ -528,16 +838,40 @@ class LupeGUI:
                     except Exception as e:
                         self._log(f"  [WARNING] Could not create master summary: {str(e)}")
 
-                self._log(f"[OK] Completed processing: {csv_file.name}")
+                # Calculate elapsed time for this file
+                file_elapsed = time.time() - file_start_time
+                file_time_str = self._format_elapsed_time(file_elapsed)
 
-                # Aggressively free memory after each file completes all processing
-                # This ensures garbage collection happens between files
+                self._log(f"[OK] Completed processing: {csv_file.name} (took {file_time_str})")
+
+                # Phase 1 Fix 1B: Explicitly delete behaviors_dict to free memory
+                del behaviors_dict
+
+                # Phase 1 Fix 1A: Close all figures to prevent memory leak
+                # This clears matplotlib's internal figure cache that accumulates over multiple files
+                self._log_memory_status(f"Before cleanup file {file_idx}")
+                close_all_plots()
+
+                # Phase 1 Fix 1C: Aggressive garbage collection (double call for Windows)
+                # Windows systems benefit from multiple gc.collect() calls to resolve circular references
                 gc.collect()
+                gc.collect()
+
+                # Log memory after cleanup
+                self._log_memory_status(f"After cleanup file {file_idx}")
+
+            # Calculate total analysis time
+            total_elapsed = time.time() - analysis_start_time
+            total_time_str = self._format_elapsed_time(total_elapsed)
 
             self._log("\n" + "=" * 60)
             self._log("All analyses completed successfully!")
+            self._log(f"Total time: {total_time_str}")
             self._log(f"Results saved to: {base_output_dir}")
             self._log("=" * 60)
+
+            # Log final memory state
+            self._log_memory_status("All files complete")
 
             # Show completion message
             self.root.after(0, lambda: messagebox.showinfo(
@@ -553,6 +887,14 @@ class LupeGUI:
             self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
 
         finally:
+            # Phase 2 Fix: Release model from memory after all processing
+            # Model can be 50-200MB depending on complexity
+            if 'model' in locals():
+                self._log("[CLEANUP] Releasing model from memory")
+                del model
+                gc.collect()
+                self._log_memory_status("After model cleanup")
+
             # Re-enable run button
             self.root.after(0, lambda: self.run_button.configure(state='normal'))
             self._update_progress(0)

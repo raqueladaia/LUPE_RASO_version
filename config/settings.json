@@ -6,7 +6,7 @@
     "default_model_path": "",
     "default_model_path_description": "Path to the LUPE A-SOiD model file (.pkl)",
     "default_data_input_path": "",
-    "default_data_input_path_description": "Default directory for input data (DLC CSV files)",
+    "default_data_input_path_description": "Default directory for input data (DLC files)",
     "default_output_path": "outputs",
     "default_output_path_description": "Default directory for analysis outputs"
   },
@@ -28,7 +28,7 @@
     "likelihood_threshold": 0.1,
     "likelihood_threshold_description": "Minimum likelihood threshold for DLC pose filtering (0.0-1.0)",
     "skip_rows": 0,
-    "skip_rows_description": "Number of extra rows to skip when loading DLC CSV files",
+    "skip_rows_description": "Number of extra rows to skip when loading DLC files",
     "save_preprocessed": true,
     "save_preprocessed_description": "Save preprocessed pose data for future use",
     "interpolation_method": "linear",

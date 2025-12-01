@@ -152,12 +152,62 @@ class LupeLauncher:
             # Get the path to the main_lupe_gui.py script
             script_path = Path(__file__).parent / "main_lupe_gui.py"
 
-            # Launch as subprocess
+            # Validate script exists
+            if not script_path.exists():
+                raise FileNotFoundError(f"GUI script not found: {script_path}")
+
+            # Launch as subprocess (without capturing output to allow GUI to show)
+            # Use CREATE_NO_WINDOW flag on Windows to prevent console window
+            import platform
+            startupinfo = None
+            if platform.system() == 'Windows':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
             self.lupe_process = subprocess.Popen(
                 [sys.executable, str(script_path)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                startupinfo=startupinfo,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE
             )
+
+            # Give it a moment to start, then check if it failed immediately
+            import time
+            time.sleep(1.0)  # Increased from 0.5s to 1.0s for more reliable detection
+
+            # Check if process failed immediately
+            if self.lupe_process.poll() is not None:
+                # Process already terminated - read error
+                try:
+                    stdout, stderr = self.lupe_process.communicate(timeout=2)
+
+                    # Try stderr first, then stdout if stderr is empty
+                    error_msg = ""
+                    if stderr:
+                        error_msg = stderr.decode('utf-8', errors='ignore').strip()
+                    if not error_msg and stdout:
+                        error_msg = stdout.decode('utf-8', errors='ignore').strip()
+                    if not error_msg:
+                        error_msg = f"Process exited with code {self.lupe_process.returncode}"
+
+                    messagebox.showerror(
+                        "Launch Error",
+                        f"LUPE GUI failed to start:\n\n{error_msg[:500]}"
+                    )
+                    self.status_label.config(text="Launch failed. See error message.")
+                except subprocess.TimeoutExpired:
+                    messagebox.showerror(
+                        "Launch Error",
+                        "Process terminated but error output could not be read."
+                    )
+                    self.status_label.config(text="Launch failed.")
+                except Exception as e:
+                    messagebox.showerror(
+                        "Launch Error",
+                        f"Process terminated with error:\n{str(e)}"
+                    )
+                    self.status_label.config(text="Launch failed.")
+                return
 
             self.status_label.config(text="LUPE Classification GUI opened.")
         except Exception as e:
@@ -186,12 +236,62 @@ class LupeLauncher:
             # Get the path to the main_lupe_amps_gui.py script
             script_path = Path(__file__).parent / "main_lupe_amps_gui.py"
 
-            # Launch as subprocess
+            # Validate script exists
+            if not script_path.exists():
+                raise FileNotFoundError(f"GUI script not found: {script_path}")
+
+            # Launch as subprocess (without capturing output to allow GUI to show)
+            # Use CREATE_NO_WINDOW flag on Windows to prevent console window
+            import platform
+            startupinfo = None
+            if platform.system() == 'Windows':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
             self.amps_process = subprocess.Popen(
                 [sys.executable, str(script_path)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                startupinfo=startupinfo,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE
             )
+
+            # Give it a moment to start, then check if it failed immediately
+            import time
+            time.sleep(1.0)  # Increased from 0.5s to 1.0s for more reliable detection
+
+            # Check if process failed immediately
+            if self.amps_process.poll() is not None:
+                # Process already terminated - read error
+                try:
+                    stdout, stderr = self.amps_process.communicate(timeout=2)
+
+                    # Try stderr first, then stdout if stderr is empty
+                    error_msg = ""
+                    if stderr:
+                        error_msg = stderr.decode('utf-8', errors='ignore').strip()
+                    if not error_msg and stdout:
+                        error_msg = stdout.decode('utf-8', errors='ignore').strip()
+                    if not error_msg:
+                        error_msg = f"Process exited with code {self.amps_process.returncode}"
+
+                    messagebox.showerror(
+                        "Launch Error",
+                        f"LUPE-AMPS GUI failed to start:\n\n{error_msg[:500]}"
+                    )
+                    self.status_label.config(text="Launch failed. See error message.")
+                except subprocess.TimeoutExpired:
+                    messagebox.showerror(
+                        "Launch Error",
+                        "Process terminated but error output could not be read."
+                    )
+                    self.status_label.config(text="Launch failed.")
+                except Exception as e:
+                    messagebox.showerror(
+                        "Launch Error",
+                        f"Process terminated with error:\n{str(e)}"
+                    )
+                    self.status_label.config(text="Launch failed.")
+                return
 
             self.status_label.config(text="LUPE-AMPS GUI opened.")
         except Exception as e:

@@ -432,7 +432,7 @@ def create_multi_subplot(n_rows: int, n_cols: int,
 
 def close_all_plots():
     """
-    Close all open matplotlib figures to free memory.
+    Close all open figures to free memory.
 
     Use this after creating many plots to avoid memory issues.
 

@@ -519,33 +519,46 @@ def fast_feature_binning(features: List, framerate: int, index: np.ndarray) -> L
     The classifier works on binned features rather than frame-by-frame.
     This function aggregates features over small time windows.
 
+    IMPORTANT: This function is optimized for INFERENCE ONLY.
+    It computes only offset=0 binning to save 83% memory compared to the
+    original B-SOiD training approach (which computed 6 time-shift offsets).
+
     Args:
         features (List): List of feature arrays from fast_feature_extraction
         framerate (int): Video framerate (e.g., 60 fps)
         index (np.ndarray): Keypoint pair indices
 
     Returns:
-        List: List of binned feature arrays
+        List: List of binned feature arrays (one per input feature array)
+              Each array contains offset=0 binning only.
 
     Note:
         - Bin width is framerate/10 (e.g., 60fps -> 6 frames per bin = 0.1s)
         - Lengths/angles are averaged within bins
         - Displacements are summed within bins
+        - Only offset=0 is computed (inference mode hardcoded)
+        - Original B-SOiD computed 6 offsets for training augmentation
+        - For inference, offset=0 provides identical classification results
     """
     binned_features_list = List()
     for n in range(len(features)):
         bin_width = int(framerate / 10)  # E.g., 60fps -> 6 frames = 0.1 second bins
-        for s in range(bin_width):
-            binned_features = np.zeros((int(features[n].shape[0] / bin_width), features[n].shape[1]),
-                                       dtype=np.float64)
-            for b in range(bin_width + s, features[n].shape[0], bin_width):
-                # Average lengths and angles
-                binned_features[int(b / bin_width) - 1, 0:index.shape[1]] = np_mean(
-                    features[n][(b - bin_width):b, 0:index.shape[1]], 0)
-                # Sum displacements
-                binned_features[int(b / bin_width) - 1, index.shape[1]:] = np.sum(
-                    features[n][(b - bin_width):b, index.shape[1]:], axis=0)
-            binned_features_list.append(binned_features)
+
+        # INFERENCE MODE: Hardcoded to compute ONLY offset=0
+        # This saves 83% memory (was 6 offsets, now 1 offset)
+        # s=0 means binning starts at frame 0 (standard approach)
+        s = 0
+
+        binned_features = np.zeros((int(features[n].shape[0] / bin_width), features[n].shape[1]),
+                                   dtype=np.float64)
+        for b in range(bin_width + s, features[n].shape[0], bin_width):
+            # Average lengths and angles
+            binned_features[int(b / bin_width) - 1, 0:index.shape[1]] = np_mean(
+                features[n][(b - bin_width):b, 0:index.shape[1]], 0)
+            # Sum displacements
+            binned_features[int(b / bin_width) - 1, index.shape[1]:] = np.sum(
+                features[n][(b - bin_width):b, index.shape[1]:], axis=0)
+        binned_features_list.append(binned_features)
     return binned_features_list
 
 
@@ -556,12 +569,22 @@ def bsoid_extract_numba(data: List, fps: int) -> List:
     This is the main entry point for feature extraction, combining
     feature extraction and binning steps.
 
+    IMPORTANT: Optimized for INFERENCE ONLY (not training).
+    Only computes offset=0 binning, saving 83% memory.
+
     Args:
         data (List): List of pose data arrays
         fps (int): Framerate of the video
 
     Returns:
         List: List of binned features ready for classification
+              - Returns 1 binned array per input (offset=0 only)
+              - Saves 83% memory vs original B-SOiD training approach
+
+    Note:
+        Feature binning is hardcoded to inference mode (offset=0 only).
+        This reduces memory usage by 83% compared to computing all
+        time-shift offsets (which are only needed during model training).
 
     Example:
         >>> from numba.typed import List
@@ -575,7 +598,7 @@ def bsoid_extract_numba(data: List, fps: int) -> List:
     # Extract raw features
     features = fast_feature_extraction(data, index * 2)
 
-    # Bin features into time windows
+    # Bin features into time windows (hardcoded to inference mode)
     binned_features = fast_feature_binning(features, fps, index * 2)
 
     return binned_features
@@ -608,12 +631,33 @@ def feature_extraction(train_datalist: list, num_train: int, framerate: int) -> 
     for i in tqdm(range(num_train), desc="Extracting features", disable=True):
         data_list = List()
         data_list.append(train_datalist[i])
+
+        # DEBUG logging before binning
+        if i == 0:  # Only print for first file to avoid log spam
+            print(f"[DEBUG] Input pose shape: {train_datalist[i].shape}")
+            print(f"[DEBUG] Input pose size: {train_datalist[i].nbytes / (1024*1024):.1f} MB")
+            print(f"[DEBUG] Framerate: {framerate}")
+            print(f"[DEBUG] Calling bsoid_extract_numba()...")
+
         binned_features = bsoid_extract_numba(data_list, framerate)
+
+        # DEBUG: Verify only 1 array is created (should be 1, not 6)
+        if i == 0:  # Only print for first file to avoid log spam
+            print(f"[DEBUG] Binned features created: {len(binned_features)} array(s) (expected: 1)")
+            if len(binned_features) > 0:
+                print(f"[DEBUG] First binned feature shape: {binned_features[0].shape}")
+                print(f"[DEBUG] First binned feature size: {binned_features[0].nbytes / (1024*1024):.1f} MB")
+                # Calculate expected bin count
+                bin_width = int(framerate / 10)
+                expected_bins = int(train_datalist[i].shape[0] / bin_width)
+                print(f"[DEBUG] Expected bins: {expected_bins} (frames: {train_datalist[i].shape[0]}, bin_width: {bin_width})")
+
         f_integrated.append(binned_features[0])  # Get the non-shifted version
 
         # Free the binned_features list immediately after use
-        # binned_features contains 6 arrays (bin_width iterations) but only [0] is used
-        # For a 150 MB pose file, this frees ~1.2 GB of wasted memory per file
+        # Binning is hardcoded to inference mode: only 1 array (offset=0) is created
+        # This saves 83% memory compared to training mode (which creates 6 arrays)
+        # For a 150 MB pose file, this prevents creating ~1.2 GB of wasted data
         del binned_features
         del data_list
         # NOTE: gc.collect() removed from loop - was causing 5-10 min hangs on Windows
