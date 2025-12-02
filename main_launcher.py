@@ -164,11 +164,15 @@ class LupeLauncher:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
+            # IMPORTANT: Do NOT use PIPE for stdout/stderr without reading them!
+            # Pipe buffers are limited (~64KB on Windows) and will cause the
+            # subprocess to hang when the buffer fills up during long operations.
+            # Using DEVNULL discards output but prevents blocking.
             self.lupe_process = subprocess.Popen(
                 [sys.executable, str(script_path)],
                 startupinfo=startupinfo,
-                stderr=subprocess.PIPE,
-                stdout=subprocess.PIPE
+                stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL
             )
 
             # Give it a moment to start, then check if it failed immediately
@@ -177,36 +181,14 @@ class LupeLauncher:
 
             # Check if process failed immediately
             if self.lupe_process.poll() is not None:
-                # Process already terminated - read error
-                try:
-                    stdout, stderr = self.lupe_process.communicate(timeout=2)
-
-                    # Try stderr first, then stdout if stderr is empty
-                    error_msg = ""
-                    if stderr:
-                        error_msg = stderr.decode('utf-8', errors='ignore').strip()
-                    if not error_msg and stdout:
-                        error_msg = stdout.decode('utf-8', errors='ignore').strip()
-                    if not error_msg:
-                        error_msg = f"Process exited with code {self.lupe_process.returncode}"
-
-                    messagebox.showerror(
-                        "Launch Error",
-                        f"LUPE GUI failed to start:\n\n{error_msg[:500]}"
-                    )
-                    self.status_label.config(text="Launch failed. See error message.")
-                except subprocess.TimeoutExpired:
-                    messagebox.showerror(
-                        "Launch Error",
-                        "Process terminated but error output could not be read."
-                    )
-                    self.status_label.config(text="Launch failed.")
-                except Exception as e:
-                    messagebox.showerror(
-                        "Launch Error",
-                        f"Process terminated with error:\n{str(e)}"
-                    )
-                    self.status_label.config(text="Launch failed.")
+                # Process already terminated
+                error_msg = f"Process exited with code {self.lupe_process.returncode}"
+                messagebox.showerror(
+                    "Launch Error",
+                    f"LUPE GUI failed to start:\n\n{error_msg}\n\n"
+                    "Check the console or run main_lupe_gui.py directly for details."
+                )
+                self.status_label.config(text="Launch failed. See error message.")
                 return
 
             self.status_label.config(text="LUPE Classification GUI opened.")
@@ -248,11 +230,15 @@ class LupeLauncher:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
+            # IMPORTANT: Do NOT use PIPE for stdout/stderr without reading them!
+            # Pipe buffers are limited (~64KB on Windows) and will cause the
+            # subprocess to hang when the buffer fills up during long operations.
+            # Using DEVNULL discards output but prevents blocking.
             self.amps_process = subprocess.Popen(
                 [sys.executable, str(script_path)],
                 startupinfo=startupinfo,
-                stderr=subprocess.PIPE,
-                stdout=subprocess.PIPE
+                stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL
             )
 
             # Give it a moment to start, then check if it failed immediately
@@ -261,36 +247,14 @@ class LupeLauncher:
 
             # Check if process failed immediately
             if self.amps_process.poll() is not None:
-                # Process already terminated - read error
-                try:
-                    stdout, stderr = self.amps_process.communicate(timeout=2)
-
-                    # Try stderr first, then stdout if stderr is empty
-                    error_msg = ""
-                    if stderr:
-                        error_msg = stderr.decode('utf-8', errors='ignore').strip()
-                    if not error_msg and stdout:
-                        error_msg = stdout.decode('utf-8', errors='ignore').strip()
-                    if not error_msg:
-                        error_msg = f"Process exited with code {self.amps_process.returncode}"
-
-                    messagebox.showerror(
-                        "Launch Error",
-                        f"LUPE-AMPS GUI failed to start:\n\n{error_msg[:500]}"
-                    )
-                    self.status_label.config(text="Launch failed. See error message.")
-                except subprocess.TimeoutExpired:
-                    messagebox.showerror(
-                        "Launch Error",
-                        "Process terminated but error output could not be read."
-                    )
-                    self.status_label.config(text="Launch failed.")
-                except Exception as e:
-                    messagebox.showerror(
-                        "Launch Error",
-                        f"Process terminated with error:\n{str(e)}"
-                    )
-                    self.status_label.config(text="Launch failed.")
+                # Process already terminated
+                error_msg = f"Process exited with code {self.amps_process.returncode}"
+                messagebox.showerror(
+                    "Launch Error",
+                    f"LUPE-AMPS GUI failed to start:\n\n{error_msg}\n\n"
+                    "Check the console or run main_lupe_amps_gui.py directly for details."
+                )
+                self.status_label.config(text="Launch failed. See error message.")
                 return
 
             self.status_label.config(text="LUPE-AMPS GUI opened.")

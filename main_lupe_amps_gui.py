@@ -34,6 +34,13 @@ Output Structure:
         └── feature_importance.png/svg/csv
 """
 
+# CRITICAL: Set matplotlib backend BEFORE any other imports
+# This must happen before pyplot is imported anywhere in the codebase
+# Using 'Agg' backend prevents threading deadlocks on Windows when
+# matplotlib is called from background threads (which the GUI uses)
+import matplotlib
+matplotlib.use('Agg')
+
 from src.gui.lupe_amps_window import LupeAmpsGUI
 
 

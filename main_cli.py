@@ -12,6 +12,11 @@ For detailed help on any command:
     python main_cli.py <command> --help
 """
 
+# CRITICAL: Set matplotlib backend BEFORE any other imports
+# This prevents threading issues when running analysis in parallel
+import matplotlib
+matplotlib.use('Agg')
+
 import sys
 from pathlib import Path
 

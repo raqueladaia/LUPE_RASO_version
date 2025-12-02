@@ -19,7 +19,11 @@ Usage:
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
+# NOTE: matplotlib.pyplot is imported inside methods that need it
+# This ensures the backend is set before pyplot is loaded
+# The entry point (main_lupe_amps_gui.py) must set matplotlib.use('Agg') first
+
 import seaborn as sns
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -226,6 +230,9 @@ class LupeAmpsAnalysis:
             output_path (str): Path to save plot (without extension)
             title (str): Plot title
         """
+        # Import pyplot here to ensure backend is set before use
+        import matplotlib.pyplot as plt
+
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -278,6 +285,9 @@ class LupeAmpsAnalysis:
             output_dir (str): Directory to save plots
             project_name (str): Project name for file naming
         """
+        # Import pyplot here to ensure backend is set before use
+        import matplotlib.pyplot as plt
+
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -395,6 +405,9 @@ class LupeAmpsAnalysis:
             window_slide_sec (int): Sliding step in seconds
             n_permutations (int): Number of permutations for condition 9
         """
+        # Import pyplot here to ensure backend is set before use
+        import matplotlib.pyplot as plt
+
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 

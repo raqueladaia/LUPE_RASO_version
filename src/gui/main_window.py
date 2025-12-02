@@ -45,7 +45,10 @@ from pathlib import Path
 import gc
 import time
 import psutil
-import matplotlib.pyplot as plt
+
+# NOTE: Do NOT import matplotlib.pyplot here - it must be imported AFTER
+# the backend is set in the entry point (main_lupe_gui.py).
+# Use matplotlib.pyplot inline where needed for diagnostics.
 
 import numpy as np
 import pandas as pd
@@ -78,7 +81,7 @@ class LupeGUI:
         """Initialize the GUI application."""
         self.root = tk.Tk()
         self.root.title("LUPE Analysis Tool")
-        self.root.geometry("900x560")
+        self.root.geometry("900x680")
 
         # Application state
         self.dlc_csv_paths = []
@@ -110,9 +113,10 @@ class LupeGUI:
         try:
             process = psutil.Process()
             memory_mb = process.memory_info().rss / 1024 / 1024
-            fig_count = len(plt.get_fignums())
+            # Import pyplot inline to avoid importing before backend is set
+            import matplotlib.pyplot as plt
 
-            msg = f"[MEMORY] {label}: {memory_mb:.1f} MB used, {fig_count} figures open"
+            msg = f"[MEMORY] {label}: {memory_mb:.1f} MB used"
             self._log(msg)
         except Exception as e:
             self._log(f"[MEMORY] Could not get memory info: {str(e)}")
@@ -792,7 +796,8 @@ class LupeGUI:
                 if self.analyses['durations'].get():
                     try:
                         self._log(f"  - Bout durations...")
-                        analyze_bout_durations(behaviors_dict, str(analysis_dir), file_prefix=partial_name)
+                        analyze_bout_durations(behaviors_dict, str(analysis_dir),
+                                              framerate=framerate, file_prefix=partial_name)
                         self._log(f"    [OK] Complete")
                     except Exception as e:
                         self._log(f"    [ERROR] {str(e)}")
@@ -803,7 +808,8 @@ class LupeGUI:
                     try:
                         self._log(f"  - Timeline...")
                         analyze_binned_timeline(behaviors_dict, str(analysis_dir),
-                                              bin_size_minutes=bin_minutes, file_prefix=partial_name)
+                                              bin_size_minutes=bin_minutes, framerate=framerate,
+                                              file_prefix=partial_name)
                         self._log(f"    [OK] Complete")
                     except Exception as e:
                         self._log(f"    [ERROR] {str(e)}")

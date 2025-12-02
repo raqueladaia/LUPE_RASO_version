@@ -164,6 +164,11 @@ For more information, visit: https://github.com/your-repo/LUPE-analysis
         default=1.0,
         help='Bin size in minutes for timeline analysis'
     )
+    analyze_parser.add_argument(
+        '--framerate',
+        type=float,
+        help='Video framerate in fps (default: from config, typically 60)'
+    )
 
     # ============ EXPORT Command ============
     export_parser = subparsers.add_parser(
@@ -286,6 +291,11 @@ For more information, visit: https://github.com/your-repo/LUPE-analysis
         nargs='*',
         choices=['instance_counts', 'total_frames', 'durations', 'timeline', 'transitions'],
         help='Analyses to skip (default: run all)'
+    )
+    run_parser.add_argument(
+        '--framerate',
+        type=float,
+        help='Video framerate in fps (default: from config, typically 60)'
     )
 
     # Parse arguments
@@ -484,9 +494,13 @@ def cmd_analyze(args):
         print("Run 'python main_cli.py analyze --help' for options.")
         return
 
-    # Get configuration for behavior names
+    # Get configuration for behavior names and framerate
     config = get_config()
     behavior_names = config.get_behavior_names()
+
+    # Use user-specified framerate or fall back to config default
+    framerate = args.framerate if args.framerate else config.get_framerate()
+    print(f"Using framerate: {framerate} fps")
 
     # Process each file individually (matching GUI behavior)
     print(f"\nProcessing {len(behaviors)} file(s)...")
@@ -529,7 +543,8 @@ def cmd_analyze(args):
         if 'durations' in selected_analyses:
             try:
                 print(f"  - Bout durations...")
-                analyze_bout_durations(file_behaviors, str(analysis_dir), file_prefix=file_name)
+                analyze_bout_durations(file_behaviors, str(analysis_dir),
+                                      framerate=framerate, file_prefix=file_name)
                 print(f"    [OK] Complete")
                 analysis_count += 1
             except Exception as e:
@@ -539,7 +554,8 @@ def cmd_analyze(args):
             try:
                 print(f"  - Timeline...")
                 analyze_binned_timeline(file_behaviors, str(analysis_dir),
-                                      bin_size_minutes=args.bin_minutes, file_prefix=file_name)
+                                      bin_size_minutes=args.bin_minutes, framerate=framerate,
+                                      file_prefix=file_name)
                 print(f"    [OK] Complete")
                 analysis_count += 1
             except Exception as e:
@@ -744,8 +760,11 @@ def cmd_run(args):
 
     # Get configuration
     config = get_config()
-    framerate = config.get_framerate()
     behavior_names = config.get_behavior_names()
+
+    # Use user-specified framerate or fall back to config default
+    framerate = args.framerate if args.framerate else config.get_framerate()
+    print(f"Using framerate: {framerate} fps")
 
     # Get base output directory
     base_output_dir = Path(args.output)
@@ -853,7 +872,8 @@ def cmd_run(args):
             if 'durations' in selected_analyses:
                 try:
                     print("    - Bout durations...")
-                    analyze_bout_durations(file_behaviors, str(analysis_dir), file_prefix=partial_name)
+                    analyze_bout_durations(file_behaviors, str(analysis_dir),
+                                          framerate=framerate, file_prefix=partial_name)
                     print("      [OK] Complete")
                     analysis_count += 1
                 except Exception as e:
@@ -863,7 +883,8 @@ def cmd_run(args):
                 try:
                     print("    - Timeline...")
                     analyze_binned_timeline(file_behaviors, str(analysis_dir),
-                                          bin_size_minutes=args.bin_minutes, file_prefix=partial_name)
+                                          bin_size_minutes=args.bin_minutes, framerate=framerate,
+                                          file_prefix=partial_name)
                     print("      [OK] Complete")
                     analysis_count += 1
                 except Exception as e:

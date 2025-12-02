@@ -12,6 +12,13 @@ The GUI provides an easy-to-use interface for:
 - Exporting results
 """
 
+# CRITICAL: Set matplotlib backend BEFORE any other imports
+# This must happen before pyplot is imported anywhere in the codebase
+# Using 'Agg' backend prevents threading deadlocks on Windows when
+# matplotlib is called from background threads (which the GUI uses)
+import matplotlib
+matplotlib.use('Agg')
+
 import sys
 import os
 from pathlib import Path

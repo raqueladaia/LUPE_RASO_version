@@ -17,12 +17,29 @@ Usage:
 """
 
 # Configure matplotlib to use thread-safe backend for Windows compatibility
-# Must be set BEFORE importing pyplot to avoid threading deadlocks
+# NOTE: The backend should already be set by the entry point (main_lupe_gui.py)
+# before this module is imported. This is a safety fallback.
 import matplotlib
-matplotlib.use('Agg')  # Non-GUI backend prevents threading issues in background threads
+
+# Verify/set backend - warn if it's wrong (indicates import order problem)
+current_backend = matplotlib.get_backend()
+if current_backend != 'agg':
+    # Try to set it (will only work if pyplot hasn't been imported yet)
+    try:
+        matplotlib.use('Agg')
+        print(f"[PLOTTING] Backend changed from '{current_backend}' to 'Agg'")
+    except Exception:
+        # Backend is locked - pyplot was already imported elsewhere
+        print(f"[WARNING] matplotlib backend is '{current_backend}', expected 'agg'.")
+        print("[WARNING] This may cause threading issues. Ensure backend is set at entry point.")
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+
+# Final backend verification (for debugging)
+_final_backend = matplotlib.get_backend()
+if _final_backend.lower() != 'agg':
+    print(f"[WARNING] Final backend is '{_final_backend}', threading deadlocks may occur.")
 import seaborn as sns
 import numpy as np
 import pandas as pd
@@ -51,6 +68,11 @@ def save_figure(fig: plt.Figure, output_path: str, dpi: Optional[int] = None):
     """
     Save a matplotlib figure to file.
 
+    This function includes safeguards against threading issues:
+    - Verifies Agg backend is in use (thread-safe)
+    - Wraps operations in try/finally to ensure figure is closed
+    - Provides detailed error messages for debugging
+
     Args:
         fig (plt.Figure): The figure to save
         output_path (str): Path where the figure will be saved
@@ -69,10 +91,25 @@ def save_figure(fig: plt.Figure, output_path: str, dpi: Optional[int] = None):
     output_dir = Path(output_path).parent
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    fig.savefig(output_path, dpi=dpi, bbox_inches='tight')
+    try:
+        # Verify backend before save (helps debug threading issues)
+        current_backend = matplotlib.get_backend()
+        if current_backend.lower() != 'agg':
+            print(f"[WARNING] Saving figure with backend '{current_backend}' - may hang in threads")
 
-    # Close the figure to free memory (critical for multi-file processing)
-    plt.close(fig)
+        fig.savefig(output_path, dpi=dpi, bbox_inches='tight')
+
+    except Exception as e:
+        print(f"[ERROR] Failed to save figure to {output_path}: {str(e)}")
+        raise
+
+    finally:
+        # Always close the figure to free memory, even if save failed
+        # Critical for multi-file processing to prevent memory leaks
+        try:
+            plt.close(fig)
+        except Exception:
+            pass  # Ignore errors during cleanup
 
 
 def plot_behavior_pie(values: np.ndarray,
