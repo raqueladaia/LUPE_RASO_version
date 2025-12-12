@@ -481,3 +481,279 @@ def close_all_plots():
         >>> close_all_plots()
     """
     plt.close('all')
+
+
+# =============================================================================
+# New utility functions for enhanced visualization (Groups x Timepoints grids)
+# =============================================================================
+
+def calculate_grouped_stats(
+    df: pd.DataFrame,
+    groupby_cols: List[str],
+    value_col: str = 'value'
+) -> pd.DataFrame:
+    """
+    Calculate mean, SEM, std, and count grouped by specified columns.
+
+    Args:
+        df: Input DataFrame containing the data
+        groupby_cols: List of column names to group by
+        value_col: Column containing values to aggregate (default: 'value')
+
+    Returns:
+        DataFrame with columns: [groupby_cols], mean, sem, std, n
+
+    Example:
+        >>> stats = calculate_grouped_stats(
+        ...     df, ['group', 'timepoint', 'behavior'], 'value'
+        ... )
+    """
+    if df.empty:
+        return pd.DataFrame()
+
+    # Filter to only existing columns
+    valid_cols = [c for c in groupby_cols if c in df.columns]
+    if not valid_cols:
+        return pd.DataFrame()
+
+    grouped = df.groupby(valid_cols)[value_col]
+
+    stats = grouped.agg(['mean', 'std', 'count']).reset_index()
+    stats.columns = valid_cols + ['mean', 'std', 'n']
+
+    # Calculate SEM (standard error of the mean)
+    stats['sem'] = stats['std'] / np.sqrt(stats['n'])
+
+    # Replace NaN SEM with 0 (for n=1 cases)
+    stats['sem'] = stats['sem'].fillna(0)
+
+    return stats
+
+
+def create_group_timepoint_grid(
+    n_groups: int,
+    n_timepoints: int,
+    figsize_per_subplot: Tuple[float, float] = (4, 3),
+    sharex: bool = True,
+    sharey: bool = True
+) -> Tuple[plt.Figure, np.ndarray]:
+    """
+    Create a figure with groups x timepoints subplot grid.
+
+    Args:
+        n_groups: Number of rows (groups)
+        n_timepoints: Number of columns (timepoints)
+        figsize_per_subplot: (width, height) per subplot in inches
+        sharex: Share x-axis across subplots
+        sharey: Share y-axis across subplots
+
+    Returns:
+        (figure, axes_array) where axes_array is 2D: [group_idx, timepoint_idx]
+
+    Example:
+        >>> fig, axes = create_group_timepoint_grid(2, 3)
+        >>> axes[0, 0].plot(...)  # Group 0, Timepoint 0
+    """
+    setup_plot_style()
+
+    # Ensure at least 1x1 grid
+    n_groups = max(1, n_groups)
+    n_timepoints = max(1, n_timepoints)
+
+    figsize = (figsize_per_subplot[0] * n_timepoints,
+               figsize_per_subplot[1] * n_groups)
+
+    fig, axes = plt.subplots(
+        n_groups, n_timepoints,
+        figsize=figsize,
+        sharex=sharex,
+        sharey=sharey,
+        squeeze=False  # Always return 2D array
+    )
+
+    return fig, axes
+
+
+def plot_mean_sem_bars(
+    ax: plt.Axes,
+    categories: List[str],
+    means: np.ndarray,
+    sems: np.ndarray,
+    colors: Optional[Dict[str, str]] = None,
+    capsize: int = 3,
+    bar_width: float = 0.7
+) -> None:
+    """
+    Plot bars with mean values and SEM error bars on given axes.
+
+    Args:
+        ax: Matplotlib axes to plot on
+        categories: List of category labels for x-axis
+        means: Array of mean values
+        sems: Array of SEM values for error bars
+        colors: Optional dict mapping category names to colors
+        capsize: Error bar cap size in points
+        bar_width: Width of bars (0-1)
+
+    Example:
+        >>> fig, ax = plt.subplots()
+        >>> plot_mean_sem_bars(ax, ['A', 'B', 'C'], [1, 2, 3], [0.1, 0.2, 0.3])
+    """
+    x = np.arange(len(categories))
+
+    # Get colors for each category
+    if colors is None:
+        config = get_config()
+        behavior_names = config.get_behavior_names()
+        all_colors = config.get_behavior_colors()
+        bar_colors = []
+        for cat in categories:
+            if cat in behavior_names:
+                bar_colors.append(all_colors[behavior_names.index(cat)])
+            else:
+                bar_colors.append('#1f77b4')  # Default blue
+    else:
+        bar_colors = [colors.get(cat, '#1f77b4') for cat in categories]
+
+    ax.bar(x, means, bar_width, yerr=sems, color=bar_colors,
+           capsize=capsize, error_kw={'elinewidth': 1, 'capthick': 1})
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories, rotation=45, ha='right')
+    ax.spines[['top', 'right']].set_visible(False)
+
+
+def plot_mean_sem_line(
+    ax: plt.Axes,
+    x_values: List[str],
+    means: np.ndarray,
+    sems: np.ndarray,
+    color: str = '#1f77b4',
+    label: Optional[str] = None,
+    marker: str = 'o',
+    fill_alpha: float = 0.2
+) -> None:
+    """
+    Plot a line with mean values and SEM shaded region on given axes.
+
+    Args:
+        ax: Matplotlib axes to plot on
+        x_values: List of x-axis labels (e.g., timepoint names)
+        means: Array of mean values
+        sems: Array of SEM values for shaded region
+        color: Line and fill color
+        label: Legend label
+        marker: Marker style for data points
+        fill_alpha: Transparency of SEM shaded region
+
+    Example:
+        >>> fig, ax = plt.subplots()
+        >>> plot_mean_sem_line(ax, ['Day0', 'Day7'], [1.5, 2.3], [0.2, 0.3])
+    """
+    x = np.arange(len(x_values))
+
+    ax.plot(x, means, color=color, marker=marker, label=label, linewidth=2)
+    ax.fill_between(x, means - sems, means + sems, color=color, alpha=fill_alpha)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(x_values, rotation=45, ha='right')
+    ax.spines[['top', 'right']].set_visible(False)
+
+
+def plot_transition_heatmap_subplot(
+    ax: plt.Axes,
+    matrix: pd.DataFrame,
+    title: str = '',
+    cmap: str = 'YlOrRd',
+    annotate: bool = True,
+    vmin: float = 0,
+    vmax: float = 1,
+    fmt: str = '.2f'
+) -> plt.cm.ScalarMappable:
+    """
+    Plot a single transition heatmap on given axes.
+
+    Args:
+        ax: Matplotlib axes to plot on
+        matrix: Square DataFrame with transition probabilities
+        title: Subplot title
+        cmap: Colormap name
+        annotate: Whether to show values in cells
+        vmin: Minimum value for color scale
+        vmax: Maximum value for color scale
+        fmt: Format string for annotations
+
+    Returns:
+        ScalarMappable for colorbar creation
+
+    Example:
+        >>> fig, ax = plt.subplots()
+        >>> sm = plot_transition_heatmap_subplot(ax, trans_matrix, 'Group A')
+        >>> plt.colorbar(sm, ax=ax)
+    """
+    # Use seaborn heatmap for consistent styling
+    hm = sns.heatmap(
+        matrix,
+        ax=ax,
+        annot=annotate,
+        fmt=fmt,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        cbar=False,  # We'll add a shared colorbar later
+        square=True
+    )
+
+    ax.set_title(title, fontsize=10)
+
+    # Rotate labels for readability
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=8)
+
+    # Create ScalarMappable for colorbar
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+
+    return sm
+
+
+def create_behavior_subplot_grid(
+    n_behaviors: int,
+    max_cols: int = 3,
+    figsize_per_subplot: Tuple[float, float] = (4, 3)
+) -> Tuple[plt.Figure, np.ndarray]:
+    """
+    Create a figure with a grid of subplots for behaviors.
+
+    Args:
+        n_behaviors: Number of behaviors to plot
+        max_cols: Maximum number of columns
+        figsize_per_subplot: (width, height) per subplot in inches
+
+    Returns:
+        (figure, axes_array) flattened 1D array of axes
+
+    Example:
+        >>> fig, axes = create_behavior_subplot_grid(5)
+        >>> for i, ax in enumerate(axes[:5]):
+        ...     ax.plot(...)
+    """
+    setup_plot_style()
+
+    n_cols = min(n_behaviors, max_cols)
+    n_rows = int(np.ceil(n_behaviors / max_cols))
+
+    figsize = (figsize_per_subplot[0] * n_cols,
+               figsize_per_subplot[1] * n_rows)
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize, squeeze=False)
+
+    # Flatten axes array for easier iteration
+    axes_flat = axes.flatten()
+
+    # Hide unused subplots
+    for i in range(n_behaviors, len(axes_flat)):
+        axes_flat[i].set_visible(False)
+
+    return fig, axes_flat

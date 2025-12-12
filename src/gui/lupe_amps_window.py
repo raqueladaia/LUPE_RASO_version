@@ -4,11 +4,16 @@ LUPE-AMPS Analysis GUI
 This module provides a graphical user interface for LUPE-AMPS pain scale analysis.
 
 The GUI allows users to:
-- Select multiple behavior CSV files
+- Select multiple behavior CSV files OR a folder for batch processing
 - Load LUPE-AMPS PCA model
 - Configure analysis parameters
 - Run comprehensive pain scale analysis
 - View progress in real-time
+
+Batch Mode:
+    When batch mode is enabled, the program automatically discovers behavior files
+    in a folder structure: input_folder/Animal/Date/file_behaviors.csv
+    Results are saved organized by animal/date without cross-file aggregation.
 
 Usage:
     from src.gui.lupe_amps_window import LupeAmpsGUI
@@ -23,6 +28,7 @@ import threading
 from pathlib import Path
 
 from src.core.analysis_lupe_amps import LupeAmpsAnalysis
+from src.utils.lupe_amps_helpers import discover_behavior_files
 
 
 class LupeAmpsGUI:
@@ -37,11 +43,14 @@ class LupeAmpsGUI:
         """Initialize the GUI application."""
         self.root = tk.Tk()
         self.root.title("LUPE-AMPS Pain Scale Analysis")
-        self.root.geometry("1000x616")
+        self.root.geometry("1000x700")  # Increased height for batch mode controls
 
         # Application state
         self.csv_files = []  # List of selected CSV file paths
         self.model_path = "models/model_AMPS.pkl"  # Default model path
+        self.batch_mode = False  # Whether batch processing mode is enabled
+        self.batch_folder = ""  # Root folder for batch processing
+        self.discovered_files = []  # Files discovered in batch mode
 
         # Create GUI components
         self._create_widgets()
@@ -89,27 +98,58 @@ class LupeAmpsGUI:
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
+        # ========== Input Mode Selection (Scrollable Left Column) ==========
+        mode_frame = ttk.LabelFrame(scrollable_frame, text="Input Mode", padding="10")
+        mode_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
+
+        # Mode selection radio buttons
+        self.mode_var = tk.StringVar(value="files")
+        ttk.Radiobutton(
+            mode_frame, text="Select Individual Files",
+            variable=self.mode_var, value="files",
+            command=self._toggle_mode
+        ).grid(row=0, column=0, sticky=tk.W, padx=5)
+
+        ttk.Radiobutton(
+            mode_frame, text="Batch Mode (Select Folder)",
+            variable=self.mode_var, value="batch",
+            command=self._toggle_mode
+        ).grid(row=0, column=1, sticky=tk.W, padx=5)
+
+        # Info label for batch mode
+        batch_info = ttk.Label(
+            mode_frame,
+            text="Batch mode expects: input_folder/Animal/Date/file_behaviors.csv",
+            font=('Arial', 8, 'italic'),
+            foreground='gray'
+        )
+        batch_info.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+
         # ========== Input Files Section (Scrollable Left Column) ==========
         files_frame = ttk.LabelFrame(scrollable_frame, text="Input Files", padding="10")
-        files_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
+        files_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
+        self.files_frame = files_frame  # Store reference for mode toggling
+
+        # === Individual Files Mode Controls ===
+        self.individual_frame = ttk.Frame(files_frame)
+        self.individual_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         # File list with scrollbar
-        ttk.Label(files_frame, text="Selected files:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        list_frame = ttk.Frame(files_frame)
+        ttk.Label(self.individual_frame, text="Selected files:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        list_frame = ttk.Frame(self.individual_frame)
         list_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
-        files_frame.rowconfigure(1, weight=1)
 
         self.file_listbox = tk.Listbox(list_frame, height=6, width=50, selectmode=tk.EXTENDED)
-        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.file_listbox.yview)
-        self.file_listbox.configure(yscrollcommand=scrollbar.set)
+        listbox_scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.file_listbox.yview)
+        self.file_listbox.configure(yscrollcommand=listbox_scrollbar.set)
 
         self.file_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        listbox_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         list_frame.rowconfigure(0, weight=1)
         list_frame.columnconfigure(0, weight=1)
 
         # File buttons
-        btn_frame = ttk.Frame(files_frame)
+        btn_frame = ttk.Frame(self.individual_frame)
         btn_frame.grid(row=2, column=0, columnspan=3, pady=5)
 
         ttk.Button(btn_frame, text="Browse Multiple...", command=self._add_files).pack(side=tk.LEFT, padx=2)
@@ -118,11 +158,55 @@ class LupeAmpsGUI:
 
         # File count label
         self.file_count_var = tk.StringVar(value="0 file(s) selected")
-        ttk.Label(files_frame, textvariable=self.file_count_var).grid(row=3, column=0, columnspan=3, pady=5)
+        ttk.Label(self.individual_frame, textvariable=self.file_count_var).grid(row=3, column=0, columnspan=3, pady=5)
+
+        # === Batch Mode Controls ===
+        self.batch_frame = ttk.Frame(files_frame)
+        # Don't grid yet - will be shown when batch mode is selected
+
+        # Folder selection
+        ttk.Label(self.batch_frame, text="Input Folder:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.batch_folder_var = tk.StringVar(value="")
+        ttk.Entry(self.batch_frame, textvariable=self.batch_folder_var, width=35).grid(
+            row=0, column=1, sticky=(tk.W, tk.E), padx=5
+        )
+        ttk.Button(self.batch_frame, text="Browse...", command=self._select_batch_folder).grid(row=0, column=2, padx=5)
+        self.batch_frame.columnconfigure(1, weight=1)
+
+        # Discovered files list (treeview for animal/date/file columns)
+        ttk.Label(self.batch_frame, text="Discovered files:").grid(row=1, column=0, columnspan=3, sticky=tk.W, pady=(10, 2))
+
+        tree_frame = ttk.Frame(self.batch_frame)
+        tree_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+
+        self.batch_tree = ttk.Treeview(
+            tree_frame,
+            columns=("animal", "date", "file"),
+            show="headings",
+            height=5
+        )
+        self.batch_tree.heading("animal", text="Animal")
+        self.batch_tree.heading("date", text="Date")
+        self.batch_tree.heading("file", text="Filename")
+        self.batch_tree.column("animal", width=100)
+        self.batch_tree.column("date", width=100)
+        self.batch_tree.column("file", width=200)
+
+        tree_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.batch_tree.yview)
+        self.batch_tree.configure(yscrollcommand=tree_scrollbar.set)
+
+        self.batch_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        tree_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        tree_frame.rowconfigure(0, weight=1)
+        tree_frame.columnconfigure(0, weight=1)
+
+        # Batch file count
+        self.batch_count_var = tk.StringVar(value="0 file(s) discovered")
+        ttk.Label(self.batch_frame, textvariable=self.batch_count_var).grid(row=3, column=0, columnspan=3, pady=5)
 
         # ========== Model Selection (Scrollable Left Column) ==========
         model_frame = ttk.LabelFrame(scrollable_frame, text="Model", padding="10")
-        model_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
+        model_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
 
         ttk.Label(model_frame, text="LUPE-AMPS Model:").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.model_path_var = tk.StringVar(value=self.model_path)
@@ -134,7 +218,7 @@ class LupeAmpsGUI:
 
         # ========== Parameters (Scrollable Left Column) ==========
         params_frame = ttk.LabelFrame(scrollable_frame, text="Parameters", padding="10")
-        params_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
+        params_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
 
         # Target Framerate (only user-editable parameter)
         # Recording Length and Original Framerate are auto-detected from summary CSVs
@@ -155,7 +239,7 @@ class LupeAmpsGUI:
 
         # ========== Output Settings (Scrollable Left Column) ==========
         output_frame = ttk.LabelFrame(scrollable_frame, text="Output Settings", padding="10")
-        output_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
+        output_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
 
         ttk.Label(output_frame, text="Output Directory:").grid(row=0, column=0, sticky=tk.W, pady=5)
         self.output_dir_var = tk.StringVar(value="outputs/")
@@ -173,7 +257,7 @@ class LupeAmpsGUI:
 
         # ========== Analysis Sections (Scrollable Left Column) ==========
         sections_frame = ttk.LabelFrame(scrollable_frame, text="Analysis Sections", padding="10")
-        sections_frame.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
+        sections_frame.grid(row=5, column=0, sticky=(tk.W, tk.E), pady=5, padx=5)
 
         self.sections = {}
         sections_list = [
@@ -198,7 +282,7 @@ class LupeAmpsGUI:
 
         # ========== Action Buttons (Scrollable Left Column) ==========
         action_frame = ttk.Frame(scrollable_frame)
-        action_frame.grid(row=5, column=0, pady=15, padx=5)
+        action_frame.grid(row=6, column=0, pady=15, padx=5)
 
         self.run_button = ttk.Button(
             action_frame,
@@ -275,6 +359,82 @@ class LupeAmpsGUI:
         self._update_file_count()
         self._log("Cleared all files")
 
+    def _toggle_mode(self):
+        """Toggle between individual files mode and batch mode."""
+        mode = self.mode_var.get()
+
+        if mode == "files":
+            # Show individual file selection, hide batch controls
+            self.batch_frame.grid_forget()
+            self.individual_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+            self.batch_mode = False
+            self._log("Switched to Individual Files mode")
+        else:
+            # Show batch controls, hide individual file selection
+            self.individual_frame.grid_forget()
+            self.batch_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+            self.batch_mode = True
+            self._log("Switched to Batch Mode")
+            self._log("  Expected folder structure: Animal/Date/file_behaviors.csv")
+
+    def _select_batch_folder(self):
+        """Open directory dialog to select batch input folder."""
+        dirname = filedialog.askdirectory(title="Select Input Folder for Batch Processing")
+        if dirname:
+            self.batch_folder = dirname
+            self.batch_folder_var.set(dirname)
+            self._log(f"Selected batch folder: {dirname}")
+
+            # Discover behavior files in this folder
+            self._discover_batch_files()
+
+    def _discover_batch_files(self):
+        """Discover behavior files in the selected batch folder."""
+        if not self.batch_folder:
+            return
+
+        # Clear existing items
+        for item in self.batch_tree.get_children():
+            self.batch_tree.delete(item)
+
+        self.discovered_files = []
+
+        try:
+            self._log("Discovering behavior files...")
+
+            # Use the discover function (suppress its prints by capturing)
+            import io
+            import sys
+            old_stdout = sys.stdout
+            sys.stdout = io.StringIO()
+
+            files = discover_behavior_files(self.batch_folder, check_summary=True)
+
+            # Restore stdout and get captured output
+            captured = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+
+            self.discovered_files = files
+
+            # Populate treeview
+            for f in files:
+                self.batch_tree.insert("", tk.END, values=(f['animal'], f['date'], f['filename']))
+
+            # Update count
+            count = len(files)
+            self.batch_count_var.set(f"{count} file(s) discovered")
+            self._log(f"Found {count} behavior files")
+
+            if count == 0:
+                self._log("  No files found. Please check:")
+                self._log("  - Files named *_behaviors.csv")
+                self._log("  - Corresponding *_summary.csv files exist")
+                self._log("  - Folder structure: Animal/Date/file_behaviors.csv")
+
+        except Exception as e:
+            self._log(f"Error discovering files: {str(e)}")
+            self.batch_count_var.set("Error discovering files")
+
     def _update_file_count(self):
         """Update the file count label."""
         count = len(self.csv_files)
@@ -330,10 +490,15 @@ class LupeAmpsGUI:
 
     def _run_analysis(self):
         """Run the LUPE-AMPS analysis in a background thread."""
-        # Validate inputs
-        if not self.csv_files:
-            messagebox.showerror("Error", "Please add at least one behavior CSV file.")
-            return
+        # Validate inputs based on mode
+        if self.batch_mode:
+            if not self.batch_folder or not self.discovered_files:
+                messagebox.showerror("Error", "Please select a folder and ensure files are discovered.")
+                return
+        else:
+            if not self.csv_files:
+                messagebox.showerror("Error", "Please add at least one behavior CSV file.")
+                return
 
         if not Path(self.model_path).exists():
             messagebox.showerror("Error", f"Model file not found: {self.model_path}")
@@ -350,7 +515,10 @@ class LupeAmpsGUI:
         self.progress_bar.start()
 
         # Run analysis in background thread
-        thread = threading.Thread(target=self._perform_analysis)
+        if self.batch_mode:
+            thread = threading.Thread(target=self._perform_batch_analysis)
+        else:
+            thread = threading.Thread(target=self._perform_analysis)
         thread.start()
 
     def _perform_analysis(self):
@@ -395,6 +563,65 @@ class LupeAmpsGUI:
 
         except Exception as e:
             error_msg = f"Error during analysis: {str(e)}"
+            self._log(f"\n[ERROR] {error_msg}")
+            import traceback
+            self._log(traceback.format_exc())
+            self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+
+        finally:
+            # Re-enable run button and stop progress bar
+            self.root.after(0, lambda: self.run_button.configure(state='normal'))
+            self.root.after(0, lambda: self.progress_bar.stop())
+
+    def _perform_batch_analysis(self):
+        """Perform batch analysis on all discovered files (runs in background thread)."""
+        try:
+            self._log("=" * 60)
+            self._log("Starting LUPE-AMPS Batch Analysis")
+            self._log("=" * 60)
+            self._log(f"Input folder: {self.batch_folder}")
+            self._log(f"Output folder: {self.output_dir_var.get()}")
+            self._log(f"Files to process: {len(self.discovered_files)}")
+            self._log("")
+
+            # Get selected sections
+            selected_sections = [num for num, var in self.sections.items() if var.get()]
+
+            # Create analysis object
+            analysis = LupeAmpsAnalysis(
+                model_path=self.model_path,
+                num_behaviors=6,
+                target_fps=self.target_fps_var.get()
+            )
+
+            # Run batch analysis
+            results = analysis.run_batch_analysis(
+                input_folder=self.batch_folder,
+                output_folder=self.output_dir_var.get(),
+                sections=selected_sections,
+                progress_callback=self._log
+            )
+
+            self._log("\n" + "=" * 60)
+            self._log("Batch Analysis Summary")
+            self._log("=" * 60)
+            self._log(f"Total files: {results['total_files']}")
+            self._log(f"Processed successfully: {results['processed']}")
+            self._log(f"Failed: {results['failed']}")
+            self._log(f"Output location: {self.output_dir_var.get()}")
+            self._log("=" * 60)
+
+            # Show completion message
+            self.root.after(0, lambda: messagebox.showinfo(
+                "Success",
+                f"Batch analysis completed!\n\n"
+                f"Processed: {results['processed']} / {results['total_files']} files\n"
+                f"Failed: {results['failed']}\n\n"
+                f"Results saved to:\n{self.output_dir_var.get()}"
+            ))
+
+        except Exception as e:
+            error_msg = f"Error during batch analysis: {str(e)}"
             self._log(f"\n[ERROR] {error_msg}")
             import traceback
             self._log(traceback.format_exc())
